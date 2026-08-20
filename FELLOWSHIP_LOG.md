@@ -1,6 +1,6 @@
 # 📜 Fellowship Log: Bananasball
 
-## 🗓️ 2026-08-20 (The Foundation)
+## 🗓️ 2026-08-19 (The Foundation)
 
 - feat: initialize Bananasball KMP repository and directory structure
 - feat(domain): define core models for Game, Team, and BoxScore
