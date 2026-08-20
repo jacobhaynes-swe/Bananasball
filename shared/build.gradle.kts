@@ -13,6 +13,8 @@ kotlin {
         namespace = "com.example.bananasball"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
+        withHostTestBuilder {
+        }
     }
     
     listOf(
@@ -67,6 +69,7 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
         }
     }
 }
