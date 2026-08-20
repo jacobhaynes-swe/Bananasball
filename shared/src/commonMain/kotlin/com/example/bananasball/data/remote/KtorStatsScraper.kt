@@ -14,9 +14,10 @@ class KtorStatsScraper(
     private val httpClient: HttpClient
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val seasonId = "e3acccd7-0c28-4eb8-aacf-cf907ee5c6f6" // 2026 World Tour
 
     suspend fun fetchStandings(): LeagueStandings {
-        val standingsUrl = "https://banana-stats-pages-seven.vercel.app/api/directus-items/standings?season=e3acccd7-0c28-4eb8-aacf-cf907ee5c6f6"
+        val standingsUrl = "https://banana-stats-pages-seven.vercel.app/api/directus-items/standings?season=$seasonId"
         
         try {
             val response = httpClient.get(standingsUrl).bodyAsText()
@@ -81,113 +82,115 @@ class KtorStatsScraper(
         val pitchingLeaders = mutableListOf<StatLeader.Pitching>()
 
         try {
-            // 1. Fetch Batting Leaders from API
-            val battingResponse = httpClient.get("https://banana-stats-pages-seven.vercel.app/api/stats/leaders").bodyAsText()
+            // 1. Fetch 2026 World Tour Hitting Stats from players_stats API
+            val hittingUrl = "https://banana-stats-pages-seven.vercel.app/api/stats/players_stats?subCategory=hitting&season=$seasonId&limit=150"
+            val battingResponse = httpClient.get(hittingUrl).bodyAsText()
             val battingRoot = json.parseToJsonElement(battingResponse).jsonObject
-            val battingBoards = battingRoot["boards"]?.jsonArray ?: JsonArray(emptyList())
+            val battingData = battingRoot["data"]?.jsonArray ?: JsonArray(emptyList())
 
-            val avgBoard = battingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == "Batting Average" }?.jsonObject
-            val hrBoard = battingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == "Home Runs" }?.jsonObject
-            val rbiBoard = battingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == "Runs Batted In" }?.jsonObject
-            val opsBoard = battingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == "On-Base Plus Slugging" }?.jsonObject
-            val b4sBoard = battingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull?.contains("Ball Four") == true }?.jsonObject
-            val sbBoard = battingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull?.contains("Stolen Bases") == true }?.jsonObject
+            // Filter for qualified hitters (at_bats >= 40) and sort by Hits descending
+            val qualifiedHitters = battingData.mapNotNull { item ->
+                val obj = item.jsonObject
+                val ab = obj["at_bats"]?.jsonPrimitive?.intOrNull ?: 0
+                if (ab < 40) return@mapNotNull null
+                
+                val firstName = obj["first_name"]?.jsonPrimitive?.contentOrNull ?: ""
+                val lastName = obj["last_name"]?.jsonPrimitive?.contentOrNull ?: ""
+                val fullName = "$firstName $lastName".trim()
+                
+                val teamObj = obj["team"]?.jsonObject
+                val teamName = teamObj?.get("name")?.jsonPrimitive?.contentOrNull ?: ""
+                val teamAbbr = teamObj?.get("abbreviation")?.jsonPrimitive?.contentOrNull ?: ""
+                
+                val code = StaticTeamProvider.getCodeFromName(teamAbbr) 
+                    ?: StaticTeamProvider.getCodeFromName(teamName) 
+                    ?: "SB"
+                val team = StaticTeamProvider.getTeam(code) ?: StaticTeamProvider.getTeam("SB")!!
 
-            val hrMap = extractPlayerValueMap(hrBoard)
-            val rbiMap = extractPlayerValueMap(rbiBoard)
-            val opsMap = extractPlayerValueMap(opsBoard)
-            val b4sMap = extractPlayerValueMap(b4sBoard)
-            val sbMap = extractPlayerValueMap(sbBoard)
+                val hits = obj["hits"]?.jsonPrimitive?.intOrNull ?: 0
+                val games = obj["games_played"]?.jsonPrimitive?.intOrNull ?: 0
+                val avg = obj["batting_average"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+                val hr = obj["home_runs"]?.jsonPrimitive?.intOrNull ?: 0
+                val rbi = obj["runs_batted_in"]?.jsonPrimitive?.intOrNull ?: 0
+                val ops = obj["on_base_plus_slugging"]?.jsonPrimitive?.doubleOrNull ?: (avg * 2.1)
+                val b4s = obj["ball_four_sprints"]?.jsonPrimitive?.intOrNull ?: 0
+                val sb = obj["stolen_bases"]?.jsonPrimitive?.intOrNull ?: 0
 
-            val avgLeaders = avgBoard?.get("leaders")?.jsonArray
-            if (avgLeaders != null && avgLeaders.isNotEmpty()) {
-                avgLeaders.take(10).forEachIndexed { index, item ->
-                    val pObj = item.jsonObject
-                    val firstName = pObj["first_name"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val lastName = pObj["last_name"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val fullName = "$firstName $lastName".trim()
-                    
-                    val teamObj = pObj["team"]?.jsonObject
-                    val teamName = teamObj?.get("name")?.jsonPrimitive?.contentOrNull ?: ""
-                    val teamAbbr = teamObj?.get("abbreviation")?.jsonPrimitive?.contentOrNull ?: ""
-                    
-                    val code = StaticTeamProvider.getCodeFromName(teamAbbr) 
-                        ?: StaticTeamProvider.getCodeFromName(teamName) 
-                        ?: "SB"
-                    val team = StaticTeamProvider.getTeam(code) ?: StaticTeamProvider.getTeam("SB")!!
-                    val avgVal = pObj["value"]?.jsonPrimitive?.doubleOrNull ?: .350
+                StatLeader.Batting(
+                    rank = 1,
+                    player = fullName,
+                    team = team,
+                    avg = avg,
+                    hr = hr,
+                    rbi = rbi,
+                    ops = ops,
+                    hits = hits,
+                    games = games,
+                    b4s = b4s,
+                    stolenBases = sb
+                )
+            }.sortedWith(
+                compareByDescending<StatLeader.Batting> { it.hits }
+                    .thenByDescending { it.avg }
+            ).mapIndexed { index, item -> item.copy(rank = index + 1) }
 
-                    battingLeaders.add(
-                        StatLeader.Batting(
-                            rank = index + 1,
-                            player = fullName,
-                            team = team,
-                            avg = avgVal,
-                            hr = hrMap[fullName]?.toInt() ?: 4,
-                            rbi = rbiMap[fullName]?.toInt() ?: 18,
-                            ops = opsMap[fullName] ?: (avgVal * 2.1),
-                            hits = 30 + (avgVal * 20).toInt(),
-                            games = 25,
-                            b4s = b4sMap[fullName]?.toInt() ?: 8,
-                            stolenBases = sbMap[fullName]?.toInt() ?: 10
-                        )
-                    )
-                }
-            }
+            battingLeaders.addAll(qualifiedHitters.take(15))
         } catch (e: Exception) {
             println("KtorStatsScraper: Batting API error: ${e.message}")
         }
 
         try {
-            // 2. Fetch Pitching Leaders from API
-            val pitchingResponse = httpClient.get("https://banana-stats-pages-seven.vercel.app/api/stats/leaders?subCategory=pitching").bodyAsText()
+            // 2. Fetch 2026 World Tour Pitching Stats from players_stats API
+            val pitchingUrl = "https://banana-stats-pages-seven.vercel.app/api/stats/players_stats?subCategory=pitching&season=$seasonId&limit=150"
+            val pitchingResponse = httpClient.get(pitchingUrl).bodyAsText()
             val pitchingRoot = json.parseToJsonElement(pitchingResponse).jsonObject
-            val pitchingBoards = pitchingRoot["boards"]?.jsonArray ?: JsonArray(emptyList())
+            val pitchingData = pitchingRoot["data"]?.jsonArray ?: JsonArray(emptyList())
 
-            val eraBoard = pitchingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull?.contains("Earned Run") == true }?.jsonObject
-            val soBoard = pitchingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == "Strikeouts" }?.jsonObject
-            val winsBoard = pitchingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == "Wins" }?.jsonObject
-            val savesBoard = pitchingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == "Saves" }?.jsonObject
-            val ipBoard = pitchingBoards.find { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull?.contains("Innings Pitched") == true }?.jsonObject
+            // Filter for qualified pitchers (innings_pitched >= 15.0) and sort by ERA ascending
+            val qualifiedPitchers = pitchingData.mapNotNull { item ->
+                val obj = item.jsonObject
+                val ip = obj["innings_pitched"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+                if (ip < 15.0) return@mapNotNull null
 
-            val soMap = extractPlayerValueMap(soBoard)
-            val winsMap = extractPlayerValueMap(winsBoard)
-            val savesMap = extractPlayerValueMap(savesBoard)
-            val ipMap = extractPlayerValueMap(ipBoard)
+                val firstName = obj["first_name"]?.jsonPrimitive?.contentOrNull ?: ""
+                val lastName = obj["last_name"]?.jsonPrimitive?.contentOrNull ?: ""
+                val fullName = "$firstName $lastName".trim()
 
-            val eraLeaders = eraBoard?.get("leaders")?.jsonArray
-            if (eraLeaders != null && eraLeaders.isNotEmpty()) {
-                eraLeaders.take(10).forEachIndexed { index, item ->
-                    val pObj = item.jsonObject
-                    val firstName = pObj["first_name"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val lastName = pObj["last_name"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val fullName = "$firstName $lastName".trim()
+                val teamObj = obj["team"]?.jsonObject
+                val teamName = teamObj?.get("name")?.jsonPrimitive?.contentOrNull ?: ""
+                val teamAbbr = teamObj?.get("abbreviation")?.jsonPrimitive?.contentOrNull ?: ""
 
-                    val teamObj = pObj["team"]?.jsonObject
-                    val teamName = teamObj?.get("name")?.jsonPrimitive?.contentOrNull ?: ""
-                    val teamAbbr = teamObj?.get("abbreviation")?.jsonPrimitive?.contentOrNull ?: ""
+                val code = StaticTeamProvider.getCodeFromName(teamAbbr)
+                    ?: StaticTeamProvider.getCodeFromName(teamName)
+                    ?: "SB"
+                val team = StaticTeamProvider.getTeam(code) ?: StaticTeamProvider.getTeam("SB")!!
 
-                    val code = StaticTeamProvider.getCodeFromName(teamAbbr)
-                        ?: StaticTeamProvider.getCodeFromName(teamName)
-                        ?: "SB"
-                    val team = StaticTeamProvider.getTeam(code) ?: StaticTeamProvider.getTeam("SB")!!
-                    val eraVal = pObj["value"]?.jsonPrimitive?.doubleOrNull ?: 2.50
+                val era = obj["earned_run_average"]?.jsonPrimitive?.doubleOrNull ?: 99.0
+                val wins = obj["wins"]?.jsonPrimitive?.intOrNull ?: 0
+                val so = obj["pitcher_strikeouts"]?.jsonPrimitive?.intOrNull
+                    ?: obj["strikeouts"]?.jsonPrimitive?.intOrNull ?: 0
+                val saves = obj["saves"]?.jsonPrimitive?.intOrNull ?: 0
+                val hitsAllowed = obj["hits_allowed"]?.jsonPrimitive?.intOrNull ?: 0
+                val sprintsAllowed = obj["sprints_allowed"]?.jsonPrimitive?.intOrNull ?: 0
+                val whip = if (ip > 0) ((hitsAllowed + sprintsAllowed) / ip) else 1.20
 
-                    pitchingLeaders.add(
-                        StatLeader.Pitching(
-                            rank = index + 1,
-                            player = fullName,
-                            team = team,
-                            era = eraVal,
-                            wins = winsMap[fullName]?.toInt() ?: 5,
-                            so = soMap[fullName]?.toInt() ?: 35,
-                            whip = 1.05 + (eraVal * 0.08),
-                            inningsPitched = ipMap[fullName] ?: 32.0,
-                            saves = savesMap[fullName]?.toInt() ?: 1
-                        )
-                    )
-                }
-            }
+                StatLeader.Pitching(
+                    rank = 1,
+                    player = fullName,
+                    team = team,
+                    era = era,
+                    wins = wins,
+                    so = so,
+                    whip = whip,
+                    inningsPitched = ip,
+                    saves = saves
+                )
+            }.sortedWith(
+                compareBy<StatLeader.Pitching> { it.era }
+                    .thenByDescending { it.wins }
+            ).mapIndexed { index, item -> item.copy(rank = index + 1) }
+
+            pitchingLeaders.addAll(qualifiedPitchers.take(15))
         } catch (e: Exception) {
             println("KtorStatsScraper: Pitching API error: ${e.message}")
         }
@@ -202,69 +205,59 @@ class KtorStatsScraper(
         )
     }
 
-    private fun extractPlayerValueMap(board: JsonObject?): Map<String, Double> {
-        val map = mutableMapOf<String, Double>()
-        val leaders = board?.get("leaders")?.jsonArray ?: return map
-        for (item in leaders) {
-            val obj = item.jsonObject
-            val first = obj["first_name"]?.jsonPrimitive?.contentOrNull ?: ""
-            val last = obj["last_name"]?.jsonPrimitive?.contentOrNull ?: ""
-            val fullName = "$first $last".trim()
-            val value = obj["value"]?.jsonPrimitive?.doubleOrNull ?: 0.0
-            if (fullName.isNotBlank()) {
-                map[fullName] = value
-            }
-        }
-        return map
-    }
-
     private fun getFallbackStandings(): LeagueStandings {
-        val sb = StaticTeamProvider.getTeam("SB")!!
-        val pa = StaticTeamProvider.getTeam("PA")!!
-        val ff = StaticTeamProvider.getTeam("FF")!!
         val tg = StaticTeamProvider.getTeam("TG")!!
+        val sb = StaticTeamProvider.getTeam("SB")!!
         val lbc = StaticTeamProvider.getTeam("LBC")!!
+        val ff = StaticTeamProvider.getTeam("FF")!!
+        val pa = StaticTeamProvider.getTeam("PA")!!
         val ic = StaticTeamProvider.getTeam("IC")!!
 
         val standings = listOf(
-            TeamStandings(rank = 1, team = sb, wins = 22, losses = 6, winPercentage = 0.786, gamesBehind = 0.0, streak = "W4", runDifferential = +38),
-            TeamStandings(rank = 2, team = pa, wins = 19, losses = 9, winPercentage = 0.679, gamesBehind = 3.0, streak = "W2", runDifferential = +24),
-            TeamStandings(rank = 3, team = ff, wins = 15, losses = 12, winPercentage = 0.556, gamesBehind = 6.5, streak = "L1", runDifferential = +8),
-            TeamStandings(rank = 4, team = tg, wins = 13, losses = 15, winPercentage = 0.464, gamesBehind = 9.0, streak = "W1", runDifferential = -6),
-            TeamStandings(rank = 5, team = lbc, wins = 10, losses = 17, winPercentage = 0.370, gamesBehind = 11.5, streak = "L2", runDifferential = -18),
-            TeamStandings(rank = 6, team = ic, wins = 8, losses = 19, winPercentage = 0.296, gamesBehind = 13.5, streak = "L3", runDifferential = -26)
+            TeamStandings(rank = 1, team = tg, wins = 27, losses = 22, winPercentage = 0.551, gamesBehind = 0.0, streak = "W1", runDifferential = +21),
+            TeamStandings(rank = 2, team = sb, wins = 26, losses = 22, winPercentage = 0.542, gamesBehind = 0.5, streak = "L3", runDifferential = +24),
+            TeamStandings(rank = 3, team = lbc, wins = 26, losses = 24, winPercentage = 0.520, gamesBehind = 1.5, streak = "L1", runDifferential = +11),
+            TeamStandings(rank = 4, team = ff, wins = 23, losses = 26, winPercentage = 0.469, gamesBehind = 4.0, streak = "W4", runDifferential = -27),
+            TeamStandings(rank = 5, team = pa, wins = 23, losses = 26, winPercentage = 0.469, gamesBehind = 4.0, streak = "L4", runDifferential = -3),
+            TeamStandings(rank = 6, team = ic, wins = 22, losses = 27, winPercentage = 0.449, gamesBehind = 5.0, streak = "W3", runDifferential = -19)
         )
 
         return LeagueStandings(
             season = "2026",
-            lastUpdated = "Live Sync",
+            lastUpdated = "Official 2026 World Tour",
             rankings = standings
         )
     }
 
     private fun getFallbackSeasonStats(): SeasonStats {
-        val bananas = StaticTeamProvider.getTeam("SB")!!
-        val partyAnimals = StaticTeamProvider.getTeam("PA")!!
-        val firefighters = StaticTeamProvider.getTeam("FF")!!
-        val tailgaters = StaticTeamProvider.getTeam("TG")!!
-        val clowns = StaticTeamProvider.getTeam("IC")!!
-        val coconuts = StaticTeamProvider.getTeam("LBC")!!
+        val tg = StaticTeamProvider.getTeam("TG")!!
+        val sb = StaticTeamProvider.getTeam("SB")!!
+        val lbc = StaticTeamProvider.getTeam("LBC")!!
+        val ff = StaticTeamProvider.getTeam("FF")!!
+        val pa = StaticTeamProvider.getTeam("PA")!!
+        val ic = StaticTeamProvider.getTeam("IC")!!
 
         val battingLeaders = listOf(
-            StatLeader.Batting(rank = 1, player = "Jackson Olson", team = bananas, avg = .412, hr = 8, rbi = 34, ops = 1.185, hits = 42, games = 28, b4s = 14, stolenBases = 19),
-            StatLeader.Batting(rank = 2, player = "Bill LeRoy", team = bananas, avg = .388, hr = 5, rbi = 29, ops = 1.042, hits = 38, games = 27, b4s = 9, stolenBases = 12),
-            StatLeader.Batting(rank = 3, player = "Ryan Cox", team = partyAnimals, avg = .375, hr = 7, rbi = 31, ops = 1.090, hits = 36, games = 26, b4s = 11, stolenBases = 15),
-            StatLeader.Batting(rank = 4, player = "Alex Ziegler", team = firefighters, avg = .360, hr = 4, rbi = 22, ops = .975, hits = 31, games = 24, b4s = 8, stolenBases = 10),
-            StatLeader.Batting(rank = 5, player = "Reece Hampton", team = tailgaters, avg = .348, hr = 6, rbi = 25, ops = .952, hits = 29, games = 25, b4s = 12, stolenBases = 14),
-            StatLeader.Batting(rank = 6, player = "Jason Swan", team = coconuts, avg = .335, hr = 3, rbi = 19, ops = .910, hits = 27, games = 23, b4s = 6, stolenBases = 8)
+            StatLeader.Batting(rank = 1, player = "Tanner Allen", team = lbc, avg = .402, hr = 7, rbi = 36, ops = 1.074, hits = 84, games = 50, b4s = 12, stolenBases = 3),
+            StatLeader.Batting(rank = 2, player = "Jackie Bradley Jr.", team = ic, avg = .384, hr = 8, rbi = 39, ops = 1.023, hits = 73, games = 49, b4s = 23, stolenBases = 4),
+            StatLeader.Batting(rank = 3, player = "Kyle Martin", team = tg, avg = .372, hr = 26, rbi = 76, ops = 1.312, hits = 70, games = 48, b4s = 29, stolenBases = 1),
+            StatLeader.Batting(rank = 4, player = "Dan Oberst", team = sb, avg = .375, hr = 11, rbi = 39, ops = 1.086, hits = 66, games = 48, b4s = 9, stolenBases = 17),
+            StatLeader.Batting(rank = 5, player = "Ben Parker", team = ic, avg = .380, hr = 2, rbi = 29, ops = 1.042, hits = 63, games = 48, b4s = 26, stolenBases = 8),
+            StatLeader.Batting(rank = 6, player = "Jordan Barth", team = tg, avg = .354, hr = 7, rbi = 33, ops = .943, hits = 62, games = 49, b4s = 10, stolenBases = 5),
+            StatLeader.Batting(rank = 7, player = "Dale Francis Jr.", team = ic, avg = .384, hr = 8, rbi = 40, ops = 1.086, hits = 61, games = 47, b4s = 12, stolenBases = 0),
+            StatLeader.Batting(rank = 8, player = "Tyner Hughes", team = ff, avg = .345, hr = 3, rbi = 21, ops = .885, hits = 57, games = 48, b4s = 10, stolenBases = 2),
+            StatLeader.Batting(rank = 9, player = "Chase Achuff", team = pa, avg = .350, hr = 4, rbi = 27, ops = .926, hits = 55, games = 47, b4s = 16, stolenBases = 2)
         )
 
         val pitchingLeaders = listOf(
-            StatLeader.Pitching(rank = 1, player = "Christian Dearman", team = bananas, era = 2.14, wins = 8, so = 54, whip = 0.98, inningsPitched = 42.0, saves = 2),
-            StatLeader.Pitching(rank = 2, player = "Bret Helton", team = partyAnimals, era = 2.45, wins = 7, so = 48, whip = 1.05, inningsPitched = 39.1, saves = 3),
-            StatLeader.Pitching(rank = 3, player = "Kyle Luigs", team = bananas, era = 2.78, wins = 6, so = 45, whip = 1.12, inningsPitched = 36.0, saves = 5),
-            StatLeader.Pitching(rank = 4, player = "Dylan Porter", team = firefighters, era = 3.10, wins = 5, so = 41, whip = 1.18, inningsPitched = 33.2, saves = 1),
-            StatLeader.Pitching(rank = 5, player = "Corey Phelan", team = clowns, era = 3.35, wins = 4, so = 38, whip = 1.22, inningsPitched = 31.0, saves = 2)
+            StatLeader.Pitching(rank = 1, player = "Danny Hosley", team = sb, era = 1.77, wins = 7, so = 51, whip = 1.04, inningsPitched = 40.2, saves = 11),
+            StatLeader.Pitching(rank = 2, player = "Chris Clarke", team = tg, era = 2.78, wins = 3, so = 60, whip = 1.33, inningsPitched = 58.1, saves = 0),
+            StatLeader.Pitching(rank = 3, player = "Kyle Perry", team = lbc, era = 3.21, wins = 0, so = 14, whip = 1.43, inningsPitched = 28.0, saves = 0),
+            StatLeader.Pitching(rank = 4, player = "C.J. Williams", team = lbc, era = 3.53, wins = 6, so = 51, whip = 1.28, inningsPitched = 43.1, saves = 17),
+            StatLeader.Pitching(rank = 5, player = "Nick Wilson", team = ic, era = 3.68, wins = 5, so = 40, whip = 1.36, inningsPitched = 44.0, saves = 5),
+            StatLeader.Pitching(rank = 6, player = "Drake Fontenot", team = lbc, era = 3.90, wins = 3, so = 51, whip = 1.45, inningsPitched = 83.0, saves = 0),
+            StatLeader.Pitching(rank = 7, player = "David Griffin", team = ic, era = 3.92, wins = 3, so = 69, whip = 1.42, inningsPitched = 78.0, saves = 1),
+            StatLeader.Pitching(rank = 8, player = "Brett Sanchez", team = tg, era = 4.13, wins = 5, so = 67, whip = 1.35, inningsPitched = 85.0, saves = 0)
         )
 
         return SeasonStats(

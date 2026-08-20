@@ -86,11 +86,11 @@ object StaticTeamProvider : TeamProvider {
     override fun getCodeFromName(name: String): String? {
         val normalized = name.lowercase().trim()
         return when {
-            normalized.contains("banana") || normalized == "sb" -> "SB"
+            normalized.contains("banana") || normalized == "sb" || normalized == "sav" -> "SB"
             normalized.contains("party animal") || normalized == "pa" -> "PA"
             normalized.contains("firefighter") || normalized == "ff" -> "FF"
-            normalized.contains("tailgater") || normalized == "tg" -> "TG"
-            normalized.contains("clown") || normalized == "ic" -> "IC"
+            normalized.contains("tailgater") || normalized == "tg" || normalized == "tex" -> "TG"
+            normalized.contains("clown") || normalized == "ic" || normalized == "ind" -> "IC"
             normalized.contains("coconut") || normalized == "lbc" || normalized == "bc" -> "LBC"
             else -> null
         }

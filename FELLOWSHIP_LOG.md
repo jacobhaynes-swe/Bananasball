@@ -36,6 +36,7 @@
 - feat(data): implement KtorStatsScraper parsing standings and batting/pitching leaderboards from banana-stats-pages-seven.vercel.app
 - feat(data): update Room AppDatabase schema (v4) with TeamEntity, StandingEntity, and DAOs
 - feat(data): migrate stats and standings to official Directus / Next.js JSON API endpoints
+- fix(stats): filter qualified hitters (AB >= 40) and qualified pitchers (IP >= 15) matching bananaball.com/stats 2026 World Tour table
 - feat(data): enrich schedule with live in-game scores and point totals from stats API
 - feat(ui): add 45s adaptive game-day foreground poller in ScheduleViewModel for live stream hype and scores
 - feat(ui): integrate Material 3 PullToRefreshBox across Schedule and Stats screens
