@@ -43,7 +43,7 @@ kotlin {
             
             // Kotlinx
             implementation(libs.kotlinx.serialization.json)
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+            implementation(libs.kotlinx.datetime)
             
             // Room
             api(libs.androidx.room.runtime)

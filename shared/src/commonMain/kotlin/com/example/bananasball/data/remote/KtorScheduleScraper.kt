@@ -5,6 +5,8 @@ import com.fleeksoft.ksoup.nodes.Element
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.datetime.*
 
 /**
@@ -146,6 +148,7 @@ class KtorScheduleScraper(
         }
     }
 
+    @OptIn(ExperimentalTime::class)
     private fun isWithinNextDays(dateStr: String, days: Int): Boolean {
         return try {
             val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
@@ -174,21 +177,12 @@ class KtorScheduleScraper(
      * Maps a team name (from alt text) to a standard two-letter team code.
      */
     private fun nameToCode(name: String): String {
-        val normalized = name.lowercase()
-        return when {
-            normalized.contains("banana") -> "SB"
-            normalized.contains("party animal") -> "PA"
-            normalized.contains("firefighter") -> "FF"
-            normalized.contains("tailgater") -> "TG"
-            normalized.contains("clown") -> "IC"
-            else -> {
-                // Fallback: Use first characters of words
-                val words = name.split(" ", "-", "_").filter { it.isNotEmpty() }
-                if (words.size >= 2) {
-                    (words[0].take(1) + words[1].take(1)).uppercase()
-                } else {
-                    name.take(2).uppercase()
-                }
+        return com.example.bananasball.data.repository.StaticTeamProvider.getCodeFromName(name) ?: run {
+            val words = name.split(" ", "-", "_").filter { it.isNotEmpty() }
+            if (words.size >= 2) {
+                (words[0].take(1) + words[1].take(1)).uppercase()
+            } else {
+                name.take(2).uppercase()
             }
         }
     }
@@ -198,28 +192,15 @@ class KtorScheduleScraper(
      * to the official channel for the participating teams.
      */
     private fun extractYoutubeUrl(watchCol: Element?, teamCodes: List<String>): String {
-        // Check for an explicit link first
         val link = watchCol?.selectFirst("a")?.attr("href")
         if (link != null && (link.contains("youtube.com") || link.contains("youtu.be"))) {
             return link
         }
 
-        // Fallback to text matching if no link is present
         val text = watchCol?.text() ?: ""
         val matchedCode = teamCodes.find { text.contains(it, ignoreCase = true) }
-            ?: teamCodes.firstOrNull()
+            ?: teamCodes.firstOrNull() ?: "SB"
 
-        return teamChannelMap[matchedCode] ?: DEFAULT_CHANNEL
-    }
-
-    companion object {
-        private val teamChannelMap = mapOf(
-            "SB" to "https://www.youtube.com/@TheSavannahBananas/streams",
-            "PA" to "https://www.youtube.com/@thepartyanimals.bananaball/streams",
-            "FF" to "https://www.youtube.com/@TheOfficialFirefighters/streams",
-            "TG" to "https://www.youtube.com/@TheTexasTailgaters/streams",
-            "IC" to "https://www.youtube.com/@TheIndianapolisClowns/streams"
-        )
-        private const val DEFAULT_CHANNEL = "https://www.youtube.com/@officialbananaball/streams"
+        return com.example.bananasball.data.repository.StaticTeamProvider.getChannelUrl(matchedCode)
     }
 }

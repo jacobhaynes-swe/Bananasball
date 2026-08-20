@@ -1,11 +1,13 @@
 package com.example.bananasball.data.remote
 
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.plus
 import kotlinx.datetime.DateTimeUnit
 
+@OptIn(ExperimentalTime::class)
 class MockScheduleScraper : ScheduleScraper {
     override suspend fun fetchSchedule(): List<ScrapedGame> {
         val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date

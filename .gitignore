@@ -17,3 +17,4 @@ build
 .cxx
 /androidApp/build
 /shared/build
+.kotlin/

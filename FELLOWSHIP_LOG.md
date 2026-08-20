@@ -23,10 +23,22 @@
 - test: verify live data sync and "Watch Live" intent success on Pixel 7 emulator
 - docs: identify 15-day DateRibbon hardcoding and plan for Stage 2 infinite scroll / calendar picker
 
-## 🗓️ 2026-08-20 (Engagement & Discovery)
+## 🗓️ 2026-08-20 (Multi-View Expansion & FOSS Polish)
 
 - feat(data): implement "Deep Stream Discovery" in KtorScheduleScraper to resolve direct YouTube video IDs
 - fix(data): update team handle map with verified channels for FF, TG, IC, and official backup
 - fix(intent): refactor Android Intents to force YouTube app and land directly on video players
 - test: confirm "one-click" landing on scheduled live stream for Firefighters game
-- docs: update roadmap with Team Metadata Refactor and infinite scrolling plans
+- feat(domain): enrich Team model with primary/secondary colors, roster URLs, website URLs, and YouTube channel URLs
+- feat(domain): create TeamProvider domain contract and UseCases for GetTeams, GetStandings, and GetSeasonStats
+- feat(data): implement StaticTeamProvider covering all 6 official Banana Ball teams (SB, PA, FF, TG, IC, LBC)
+- feat(data): implement KtorTeamScraper for roster and team metadata extraction from bananaball.com/teams/
+- feat(data): implement KtorStatsScraper parsing standings and batting/pitching leaderboards from banana-stats-pages-seven.vercel.app
+- feat(data): update Room AppDatabase schema (v4) with TeamEntity, StandingEntity, and DAOs
+- feat(ui): create StatsScreen with Standings card table, Batting Leaders, and Pitching Leaders sub-tabs
+- feat(ui): create TeamsScreen with team cards, branded color accent stripes, and one-tap actions for Rosters, Streams, and Websites
+- feat(ui): enhance ScheduleScreen with dynamic DateRibbon window, Material 3 DatePickerDialog, and local device start time banner
+- feat(data): parse scraped game times with timezone awareness and convert to user local device time
+- feat(ui): implement MainAppScaffold bottom navigation shell linking Schedule, Stats, and Teams
+- feat(foss): enforce strict FOSS/F-Droid compliance by loading all logos and images dynamically via Coil with zero APK-bundled brand assets
+- test: deploy and verify full multi-view navigation on Pixel 7 emulator across all screens

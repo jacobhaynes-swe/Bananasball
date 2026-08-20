@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.bananasball.domain.repository.GameRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
+@OptIn(ExperimentalTime::class)
 class ScheduleViewModel(
     private val repository: GameRepository
 ) : ViewModel() {

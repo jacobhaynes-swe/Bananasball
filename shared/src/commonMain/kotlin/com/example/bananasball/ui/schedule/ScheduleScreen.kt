@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -15,27 +16,81 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.example.bananasball.domain.model.Game
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.plus
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.time.ExperimentalTime
+import kotlinx.datetime.*
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalTime::class)
 @Composable
 fun ScheduleScreen(
     viewModel: ScheduleViewModel,
     onWatchLive: (String) -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = state.selectedDate.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val picked = Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.UTC).date
+                        viewModel.handleIntent(ScheduleIntent.OnDateSelected(picked))
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("Select", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     Scaffold(
         topBar = {
             Column(Modifier.background(MaterialTheme.colorScheme.secondary)) {
                 CenterAlignedTopAppBar(
-                    title = { Text("BANANASBALL", color = Color.White, fontWeight = FontWeight.Bold) },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    title = {
+                        Text(
+                            text = "BANANASBALL",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 2.sp
+                        )
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("📅", fontSize = 16.sp)
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent
                     )
                 )
@@ -48,7 +103,7 @@ fun ScheduleScreen(
     ) { padding ->
         if (state.isLoading && state.games.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else {
             LazyColumn(
@@ -65,8 +120,31 @@ fun ScheduleScreen(
                 
                 if (state.games.isEmpty()) {
                     item {
-                        Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Text("No games scheduled for this date", color = Color.Gray)
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("🍌", fontSize = 40.sp)
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    text = "No Games Scheduled",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = "Check adjacent dates on the ribbon or use the calendar picker.",
+                                    color = Color.Gray,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -80,35 +158,46 @@ fun DateRibbon(
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit
 ) {
-    val dates = remember {
-        val start = selectedDate.plus(-7, DateTimeUnit.DAY)
-        (0..14).map { start.plus(it, DateTimeUnit.DAY) }
+    val dates = remember(selectedDate) {
+        val start = selectedDate.plus(-10, DateTimeUnit.DAY)
+        (0..20).map { start.plus(it, DateTimeUnit.DAY) }
+    }
+
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = 8)
+
+    LaunchedEffect(selectedDate) {
+        val index = dates.indexOf(selectedDate)
+        if (index >= 0) {
+            listState.animateScrollToItem((index - 2).coerceAtLeast(0))
+        }
     }
 
     LazyRow(
+        state = listState,
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(horizontal = 16.dp)
     ) {
         items(dates) { date ->
             val isSelected = date == selectedDate
             Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f))
                     .clickable { onDateSelected(date) }
-                    .padding(8.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = date.dayOfWeek.name.take(3),
-                    color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.7f),
-                    fontSize = 12.sp
+                    color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                 )
                 Text(
-                    text = date.dayOfMonth.toString(),
+                    text = date.day.toString(),
                     color = if (isSelected) Color.Black else Color.White,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Black,
                     fontSize = 16.sp
                 )
             }
@@ -123,12 +212,12 @@ fun GameCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column {
-            // 1. YouTube Thumbnail if available
+            // YouTube Thumbnail if available
             game.streamingMetadata?.thumbnailUrl?.let { thumbUrl ->
                 Box(Modifier.fillMaxWidth().height(180.dp)) {
                     AsyncImage(
@@ -137,18 +226,19 @@ fun GameCard(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
-                    // Overlay Hype Count
+                    // Hype Count badge
                     game.streamingMetadata.waitingCount?.let { count ->
                         Surface(
                             modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-                            color = Color.Black.copy(alpha = 0.7f),
-                            shape = RoundedCornerShape(4.dp)
+                            color = Color.Black.copy(alpha = 0.75f),
+                            shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = "$count waiting",
+                                text = "🔥 $count waiting",
                                 color = Color.White,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     }
@@ -161,59 +251,98 @@ fun GameCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                        Column {
-                            Text(
-                                text = game.location,
-                                fontSize = 12.sp,
-                                color = Color.Gray,
-                                fontWeight = FontWeight.Medium
-                            )
-                            game.streamingMetadata?.actualStartTime?.let { startTime ->
-                                Text(
-                                    text = "LIVE START: ${startTime.hour}:${startTime.minute.toString().padStart(2, '0')} UTC",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF002D62),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                    Column {
+                        Text(
+                            text = game.location,
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    val isLive = game.boxScore.status.equals("Live", ignoreCase = true)
                     Surface(
-                        color = if (game.boxScore.status == "Live") Color.Red else Color.LightGray,
-                        shape = RoundedCornerShape(4.dp)
+                        color = if (isLive) Color(0xFFE53935) else Color(0xFFECEFF1),
+                        shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
                             text = game.boxScore.status.uppercase(),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            color = Color.White,
-                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = if (isLive) Color.White else Color(0xFF455A64),
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
                 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
                 
                 TeamRow(team = game.awayTeam, score = game.boxScore.awayScore)
                 Spacer(Modifier.height(8.dp))
                 TeamRow(team = game.homeTeam, score = game.boxScore.homeScore)
+
+                // Start Time in Local Device Time
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFF1F5F9)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🕒", fontSize = 13.sp)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "Start Time (Local):",
+                                fontSize = 12.sp,
+                                color = Color(0xFF475569),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Text(
+                            text = formatLocalGameTime(game.streamingMetadata?.actualStartTime ?: game.startTime),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
                 
                 if (game.youtubeUrl != null) {
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = { onWatchLive(game.youtubeUrl) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF0000)),
-                        shape = RoundedCornerShape(8.dp)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (game.boxScore.status.equals("Live", ignoreCase = true)) Color(0xFFCC0000) else MaterialTheme.colorScheme.secondary
+                        ),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
                         Text(
-                            text = if (game.boxScore.status == "Live") "WATCH LIVE" else "OPEN STREAM",
-                            fontWeight = FontWeight.Bold
+                            text = if (game.boxScore.status.equals("Live", ignoreCase = true)) "▶ WATCH LIVE" else "▶ OPEN STREAM",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
                         )
                     }
                 }
             }
         }
     }
+}
+
+private fun formatLocalGameTime(dateTime: LocalDateTime): String {
+    val hour12 = when (val h = dateTime.hour % 12) {
+        0 -> 12
+        else -> h
+    }
+    val amPm = if (dateTime.hour < 12) "AM" else "PM"
+    val minuteStr = dateTime.minute.toString().padStart(2, '0')
+    return "$hour12:$minuteStr $amPm"
 }
 
 @Composable
@@ -225,9 +354,9 @@ fun TeamRow(team: com.example.bananasball.domain.model.Team, score: Int) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
-                Modifier.size(40.dp),
+                modifier = Modifier.size(38.dp),
                 shape = CircleShape,
-                color = Color.LightGray.copy(alpha = 0.2f)
+                color = Color(0xFFF0F4F8)
             ) {
                 if (team.logoUrl != null) {
                     AsyncImage(
@@ -237,13 +366,16 @@ fun TeamRow(team: com.example.bananasball.domain.model.Team, score: Int) {
                     )
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(team.shortName.take(1), fontWeight = FontWeight.Bold)
+                        Text(team.shortName.take(1), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                     }
                 }
             }
             Spacer(Modifier.width(12.dp))
-            Text(team.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Column {
+                Text(team.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(team.shortName, color = Color.Gray, fontSize = 11.sp)
+            }
         }
-        Text(score.toString(), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Text(score.toString(), fontWeight = FontWeight.Black, fontSize = 20.sp)
     }
 }

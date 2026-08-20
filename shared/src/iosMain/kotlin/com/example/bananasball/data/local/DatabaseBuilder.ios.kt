@@ -8,9 +8,6 @@ actual fun getDatabaseBuilder(): RoomDatabase.Builder<AppDatabase> {
     val dbFilePath = NSHomeDirectory() + "/bananasball.db"
     return Room.databaseBuilder<AppDatabase>(
         name = dbFilePath,
-        factory = { AppDatabase::class.instantiateImpl() }
-    )
+        factory = { AppDatabaseConstructor.initialize() }
+    ).fallbackToDestructiveMigration(true)
 }
-
-// Helper for Room KMP iOS
-private fun AppDatabase.Companion.instantiateImpl(): AppDatabase = AppDatabase_Impl()
