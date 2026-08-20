@@ -37,6 +37,7 @@
 - feat(data): update Room AppDatabase schema (v4) with TeamEntity, StandingEntity, and DAOs
 - feat(ui): create StatsScreen with Standings card table, Batting Leaders, and Pitching Leaders sub-tabs
 - feat(ui): create TeamsScreen with team cards, branded color accent stripes, and one-tap actions for Rosters, Streams, and Websites
+- fix(teams): update Savannah Bananas and Firefighters remote logo URLs to verified endpoints
 - feat(ui): enhance ScheduleScreen with dynamic DateRibbon window, Material 3 DatePickerDialog, and local device start time banner
 - feat(data): parse scraped game times with timezone awareness and convert to user local device time
 - feat(ui): implement MainAppScaffold bottom navigation shell linking Schedule, Stats, and Teams

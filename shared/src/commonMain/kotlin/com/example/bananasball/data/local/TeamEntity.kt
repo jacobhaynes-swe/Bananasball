@@ -24,9 +24,9 @@ fun TeamEntity.toDomain(): Team {
         id = id,
         name = name.ifBlank { fallback?.name ?: id },
         shortName = shortName.ifBlank { fallback?.shortName ?: id },
-        logoUrl = logoUrl ?: fallback?.logoUrl,
-        primaryColorHex = primaryColorHex ?: fallback?.primaryColorHex,
-        secondaryColorHex = secondaryColorHex ?: fallback?.secondaryColorHex,
+        logoUrl = fallback?.logoUrl ?: logoUrl,
+        primaryColorHex = fallback?.primaryColorHex ?: primaryColorHex,
+        secondaryColorHex = fallback?.secondaryColorHex ?: secondaryColorHex,
         rosterUrl = rosterUrl ?: fallback?.rosterUrl,
         websiteUrl = websiteUrl ?: fallback?.websiteUrl,
         youtubeChannelUrl = youtubeChannelUrl ?: fallback?.youtubeChannelUrl
