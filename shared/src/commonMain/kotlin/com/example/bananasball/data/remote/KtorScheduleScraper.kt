@@ -5,6 +5,7 @@ import com.fleeksoft.ksoup.nodes.Element
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import kotlinx.datetime.*
 
 /**
  * Ktor-based implementation of [ScheduleScraper] that fetches and parses the schedule
@@ -45,7 +46,7 @@ class KtorScheduleScraper(
                 // Fallback: Check text for codes if image detection failed
                 if (teamCodes.isEmpty()) {
                     val text = teamsCol?.text() ?: ""
-                    teamCodes = listOf("SB", "PA", "FF", "TG").filter { text.contains(it) }
+                    teamCodes = listOf("SB", "PA", "FF", "TG", "IC").filter { text.contains(it) }
                 }
                 
                 println("Scraper: Processing game with teams: $teamCodes")
@@ -63,13 +64,25 @@ class KtorScheduleScraper(
                     ?: stadiumCol?.selectFirst(".game-time")?.text()?.removePrefix("@")?.trim()
                     ?: ""
 
-                // 4. YouTube URL
-                val watchCol = content.selectFirst(".col_watch")
-                val youtubeUrl = extractYoutubeUrl(watchCol, teamCodes)
-
-                // 5. Status
+                // 4. Status
                 val statusCol = content.selectFirst(".col_status")
                 val status = statusCol?.text()?.trim()
+
+                // 5. YouTube URL
+                val watchCol = content.selectFirst(".col_watch")
+                var youtubeUrl = extractYoutubeUrl(watchCol, teamCodes)
+
+                var enrichedMetadata: EnrichedStreamMetadata? = null
+
+                // If game is in the near future or Live, attempt to find direct stream link from the channel
+                if (status?.contains("Live", ignoreCase = true) == true || isWithinNextDays(date, 3)) {
+                    println("Scraper: Attempting deep discovery for upcoming stream at $youtubeUrl (Date: $date)")
+                    enrichedMetadata = discoverEnrichedMetadata(youtubeUrl)
+                    if (enrichedMetadata != null) {
+                        println("Scraper: Discovered direct stream: ${enrichedMetadata.directUrl}")
+                        youtubeUrl = enrichedMetadata.directUrl
+                    }
+                }
 
                 games.add(
                     ScrapedGame(
@@ -78,12 +91,83 @@ class KtorScheduleScraper(
                         time = time,
                         teamCodes = teamCodes,
                         youtubeUrl = youtubeUrl,
-                        status = status
+                        status = status,
+                        thumbnailUrl = enrichedMetadata?.thumbnailUrl,
+                        waitingCount = enrichedMetadata?.waitingCount,
+                        actualStartTime = enrichedMetadata?.scheduledStartTime,
+                        streamTitle = enrichedMetadata?.title
                     )
                 )
             }
         }
         return games
+    }
+
+    private suspend fun discoverEnrichedMetadata(channelUrl: String): EnrichedStreamMetadata? {
+        return try {
+            val html = httpClient.get(channelUrl).bodyAsText()
+            
+            // 1. Find the videoId that is specifically associated with a "Live" or "Scheduled" stream.
+            // On a /streams page, this is often inside a "gridVideoRenderer" or "videoRenderer"
+            // specifically for upcoming/live content.
+            val videoIdRegex = Regex("\"videoId\":\"([^\"]+)\"")
+            val videoIdMatch = videoIdRegex.find(html)
+            val videoId = videoIdMatch?.groupValues?.get(1) ?: return null
+
+            // 2. Parse the ytInitialPlayerResponse block for better data if we're on a direct video page
+            // But since we're on the /streams page, let's look for the specific renderer data
+            
+            val titleRegex = Regex("\"title\":\\{\"runs\":\\[\\{\"text\":\"([^\"]+)\"\\}\\]")
+            val title = titleRegex.find(html)?.groupValues?.get(1)
+
+            val thumbRegex = Regex("\"thumbnail\":\\{\"thumbnails\":\\[\\{\"url\":\"([^\"]+)\"")
+            val thumbUrl = thumbRegex.find(html)?.groupValues?.get(1)?.replace("\\u0026", "&")
+
+            // Hype (Waiting)
+            val waitingRegex = Regex("([0-9,]+)\\s+waiting")
+            val waitingText = waitingRegex.find(html)?.groupValues?.get(1)
+            val waitingCount = waitingText?.replace(",", "")?.toIntOrNull()
+
+            // Scheduled time (Unix)
+            val scheduledRegex = Regex("\"scheduledStartTime\":\"(\\d+)\"")
+            val scheduledStartTime = scheduledRegex.find(html)?.groupValues?.get(1)
+
+            EnrichedStreamMetadata(
+                videoId = videoId,
+                directUrl = "https://www.youtube.com/live/$videoId",
+                thumbnailUrl = thumbUrl,
+                waitingCount = waitingCount,
+                scheduledStartTime = scheduledStartTime,
+                title = title
+            )
+        } catch (e: Exception) {
+            println("Scraper: Deep discovery error for $channelUrl: ${e.message}")
+            null
+        }
+    }
+
+    private fun isWithinNextDays(dateStr: String, days: Int): Boolean {
+        return try {
+            val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+            val limit = today.plus(days, DateTimeUnit.DAY)
+            
+            // Format check: "Thursday, August 20"
+            val parts = dateStr.split(",").last().trim().split(" ")
+            if (parts.size >= 2) {
+                val monthStr = parts[0].uppercase()
+                val dayVal = parts[1].toInt()
+                val month = Month.valueOf(monthStr)
+                val year = today.year
+                val parsedDate = LocalDate(year, month, dayVal)
+                
+                // Allow games from today until 'days' into the future
+                parsedDate in today..limit
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**
@@ -134,8 +218,7 @@ class KtorScheduleScraper(
             "PA" to "https://www.youtube.com/@thepartyanimals.bananaball/streams",
             "FF" to "https://www.youtube.com/@TheOfficialFirefighters/streams",
             "TG" to "https://www.youtube.com/@TheTexasTailgaters/streams",
-            "IC" to "https://www.youtube.com/@TheIndianapolisClowns/streams",
-            "V" to "https://www.youtube.com/@officialbananaball/streams"
+            "IC" to "https://www.youtube.com/@TheIndianapolisClowns/streams"
         )
         private const val DEFAULT_CHANNEL = "https://www.youtube.com/@officialbananaball/streams"
     }

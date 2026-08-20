@@ -22,3 +22,11 @@
 - docs(council): finalize sanitization of SampleUserApp references and company IP
 - test: verify live data sync and "Watch Live" intent success on Pixel 7 emulator
 - docs: identify 15-day DateRibbon hardcoding and plan for Stage 2 infinite scroll / calendar picker
+
+## 🗓️ 2026-08-20 (Engagement & Discovery)
+
+- feat(data): implement "Deep Stream Discovery" in KtorScheduleScraper to resolve direct YouTube video IDs
+- fix(data): update team handle map with verified channels for FF, TG, IC, and official backup
+- fix(intent): refactor Android Intents to force YouTube app and land directly on video players
+- test: confirm "one-click" landing on scheduled live stream for Firefighters game
+- docs: update roadmap with Team Metadata Refactor and infinite scrolling plans

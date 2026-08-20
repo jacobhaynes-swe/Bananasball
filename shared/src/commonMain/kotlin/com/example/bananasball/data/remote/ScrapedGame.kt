@@ -11,5 +11,9 @@ data class ScrapedGame(
     val youtubeUrl: String? = null,
     val awayScore: Int? = null,
     val homeScore: Int? = null,
-    val status: String? = null
+    val status: String? = null,
+    val thumbnailUrl: String? = null,
+    val waitingCount: Int? = null,
+    val actualStartTime: String? = null,
+    val streamTitle: String? = null
 )

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.example.bananasball.domain.model.Game
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -126,47 +127,89 @@ fun GameCard(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = game.location,
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
-                )
-                Surface(
-                    color = if (game.boxScore.status == "Live") Color.Red else Color.LightGray,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = game.boxScore.status.uppercase(),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
+        Column {
+            // 1. YouTube Thumbnail if available
+            game.streamingMetadata?.thumbnailUrl?.let { thumbUrl ->
+                Box(Modifier.fillMaxWidth().height(180.dp)) {
+                    AsyncImage(
+                        model = thumbUrl,
+                        contentDescription = "Game Thumbnail",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
+                    // Overlay Hype Count
+                    game.streamingMetadata.waitingCount?.let { count ->
+                        Surface(
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                            color = Color.Black.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "$count waiting",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
             }
-            
-            Spacer(Modifier.height(16.dp))
-            
-            TeamRow(team = game.awayTeam, score = game.boxScore.awayScore)
-            Spacer(Modifier.height(8.dp))
-            TeamRow(team = game.homeTeam, score = game.boxScore.homeScore)
-            
-            if (game.youtubeUrl != null) {
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = { onWatchLive(game.youtubeUrl) },
+
+            Column(Modifier.padding(16.dp)) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF0000)),
-                    shape = RoundedCornerShape(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("WATCH LIVE ON YOUTUBE", fontWeight = FontWeight.Bold)
+                        Column {
+                            Text(
+                                text = game.location,
+                                fontSize = 12.sp,
+                                color = Color.Gray,
+                                fontWeight = FontWeight.Medium
+                            )
+                            game.streamingMetadata?.actualStartTime?.let { startTime ->
+                                Text(
+                                    text = "LIVE START: ${startTime.hour}:${startTime.minute.toString().padStart(2, '0')} UTC",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF002D62),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    Surface(
+                        color = if (game.boxScore.status == "Live") Color.Red else Color.LightGray,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = game.boxScore.status.uppercase(),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                TeamRow(team = game.awayTeam, score = game.boxScore.awayScore)
+                Spacer(Modifier.height(8.dp))
+                TeamRow(team = game.homeTeam, score = game.boxScore.homeScore)
+                
+                if (game.youtubeUrl != null) {
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = { onWatchLive(game.youtubeUrl) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF0000)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = if (game.boxScore.status == "Live") "WATCH LIVE" else "OPEN STREAM",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -181,11 +224,22 @@ fun TeamRow(team: com.example.bananasball.domain.model.Team, score: Int) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(32.dp).clip(CircleShape).background(Color.LightGray),
-                contentAlignment = Alignment.Center
+            Surface(
+                Modifier.size(40.dp),
+                shape = CircleShape,
+                color = Color.LightGray.copy(alpha = 0.2f)
             ) {
-                Text(team.shortName.take(1), fontWeight = FontWeight.Bold)
+                if (team.logoUrl != null) {
+                    AsyncImage(
+                        model = team.logoUrl,
+                        contentDescription = team.name,
+                        modifier = Modifier.fillMaxSize().padding(4.dp)
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(team.shortName.take(1), fontWeight = FontWeight.Bold)
+                    }
+                }
             }
             Spacer(Modifier.width(12.dp))
             Text(team.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)

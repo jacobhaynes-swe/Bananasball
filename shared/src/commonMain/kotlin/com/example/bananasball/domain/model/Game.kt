@@ -9,5 +9,6 @@ data class Game(
     val startTime: LocalDateTime,
     val youtubeUrl: String?,
     val boxScore: BoxScore,
-    val location: String
+    val location: String,
+    val streamingMetadata: StreamingMetadata? = null
 )

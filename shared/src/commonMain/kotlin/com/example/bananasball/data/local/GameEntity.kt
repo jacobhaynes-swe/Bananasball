@@ -18,5 +18,9 @@ data class GameEntity(
     val homeScore: Int,
     val status: String,
     val location: String,
-    val date: String // YYYY-MM-DD
+    val date: String, // YYYY-MM-DD
+    val thumbnailUrl: String? = null,
+    val waitingCount: Int? = null,
+    val actualStartTime: String? = null,
+    val streamTitle: String? = null
 )

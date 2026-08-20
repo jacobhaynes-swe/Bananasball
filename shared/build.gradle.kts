@@ -51,6 +51,10 @@ kotlin {
             
             // Paging
             api(libs.androidx.paging.common)
+
+            // Coil
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor)
         }
         androidMain.dependencies {
             implementation(libs.androidx.appcompat)
