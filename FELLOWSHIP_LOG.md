@@ -21,3 +21,4 @@
 - docs(council): rename QA specialist to Galadriel to avoid workspace confusion
 - docs(council): finalize sanitization of SampleUserApp references and company IP
 - test: verify live data sync and "Watch Live" intent success on Pixel 7 emulator
+- docs: identify 15-day DateRibbon hardcoding and plan for Stage 2 infinite scroll / calendar picker
