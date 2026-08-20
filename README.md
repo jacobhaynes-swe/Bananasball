@@ -2,7 +2,7 @@
 
 A professional-ish fan app for the **Banana Ball** league, allowing fans to quickly watch backflip catches and all the other yellow ball antics.
 
-<img src="docs/screenshots/schedule_view.png" width="400" alt="Schedule View">
+<img src="docs/screenshots/schedule_view.png" width="250" alt="Schedule View">
 
 ## Features
 
