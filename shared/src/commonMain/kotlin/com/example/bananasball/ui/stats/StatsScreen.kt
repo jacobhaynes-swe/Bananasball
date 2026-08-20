@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -78,15 +79,15 @@ fun StatsScreen(
             }
         }
     ) { padding ->
-        if (state.isLoading && state.standings == null && state.seasonStats == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
-        } else {
+        PullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.handleIntent(StatsIntent.OnRefresh) },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
             when (state.selectedTab) {
-                StatsTab.STANDINGS -> StandingsTab(standings = state.standings?.rankings ?: emptyList(), modifier = Modifier.padding(padding))
-                StatsTab.BATTING -> BattingLeadersTab(leaders = state.seasonStats?.battingLeaders ?: emptyList(), modifier = Modifier.padding(padding))
-                StatsTab.PITCHING -> PitchingLeadersTab(leaders = state.seasonStats?.pitchingLeaders ?: emptyList(), modifier = Modifier.padding(padding))
+                StatsTab.STANDINGS -> StandingsTab(standings = state.standings?.rankings ?: emptyList())
+                StatsTab.BATTING -> BattingLeadersTab(leaders = state.seasonStats?.battingLeaders ?: emptyList())
+                StatsTab.PITCHING -> PitchingLeadersTab(leaders = state.seasonStats?.pitchingLeaders ?: emptyList())
             }
         }
     }

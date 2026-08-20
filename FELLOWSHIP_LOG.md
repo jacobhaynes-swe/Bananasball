@@ -35,8 +35,10 @@
 - feat(data): implement KtorTeamScraper for roster and team metadata extraction from bananaball.com/teams/
 - feat(data): implement KtorStatsScraper parsing standings and batting/pitching leaderboards from banana-stats-pages-seven.vercel.app
 - feat(data): update Room AppDatabase schema (v4) with TeamEntity, StandingEntity, and DAOs
-- feat(ui): create StatsScreen with Standings card table, Batting Leaders, and Pitching Leaders sub-tabs
-- feat(ui): create TeamsScreen with team cards, branded color accent stripes, and one-tap actions for Rosters, Streams, and Websites
+- feat(data): migrate stats and standings to official Directus / Next.js JSON API endpoints
+- feat(data): enrich schedule with live in-game scores and point totals from stats API
+- feat(ui): add 45s adaptive game-day foreground poller in ScheduleViewModel for live stream hype and scores
+- feat(ui): integrate Material 3 PullToRefreshBox across Schedule and Stats screens
 - fix(teams): update Savannah Bananas and Firefighters remote logo URLs to verified endpoints
 - feat(ui): enhance ScheduleScreen with dynamic DateRibbon window, Material 3 DatePickerDialog, and local device start time banner
 - feat(data): parse scraped game times with timezone awareness and convert to user local device time

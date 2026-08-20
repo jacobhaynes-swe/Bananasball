@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,13 +102,13 @@ fun ScheduleScreen(
             }
         }
     ) { padding ->
-        if (state.isLoading && state.games.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
-        } else {
+        PullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.handleIntent(ScheduleIntent.OnRefresh) },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -118,7 +119,7 @@ fun ScheduleScreen(
                     )
                 }
                 
-                if (state.games.isEmpty()) {
+                if (state.games.isEmpty() && !state.isLoading) {
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(top = 24.dp),

@@ -8,33 +8,38 @@ import io.ktor.client.statement.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.datetime.*
+import kotlinx.serialization.json.*
 
 /**
  * Ktor-based implementation of [ScheduleScraper] that fetches and parses the schedule
- * from the Savannah Bananas website.
+ * from the Savannah Bananas website and enriches with live scores and YouTube stream metadata.
  */
 class KtorScheduleScraper(
     private val httpClient: HttpClient
 ) : ScheduleScraper {
+
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     override suspend fun fetchSchedule(): List<ScrapedGame> {
         println("Scraper: Fetching schedule...")
         val html = try {
             httpClient.get("https://thesavannahbananas.com/schedule/").bodyAsText()
         } catch (e: Exception) {
-            println("Scraper: Error fetching: ${e.message}")
+            println("Scraper: Error fetching HTML: ${e.message}")
             return emptyList()
         }
 
+        // Also fetch live scores from API to enrich games
+        val scoresByDateAndTeams = fetchLiveGameScores()
+
         val doc = Ksoup.parse(html)
-        println("Scraper: Parsed HTML. Document size: ${html.length}")
         val games = mutableListOf<ScrapedGame>()
 
         // The schedule is contained within rows with the "event_row" class
         val eventRows = doc.select(".event_row")
-        println("Scraper: Found ${eventRows.size} event rows")
         for (row in eventRows) {
             val date = row.selectFirst(".event_date p")?.text()?.trim() ?: ""
+            val isoDate = try { parseDate(date).toString() } catch (e: Exception) { "" }
             
             // Each event_row can contain multiple game entries (event_content)
             val contents = row.select(".event_content")
@@ -48,14 +53,11 @@ class KtorScheduleScraper(
                 // Fallback: Check text for codes if image detection failed
                 if (teamCodes.isEmpty()) {
                     val text = teamsCol?.text() ?: ""
-                    teamCodes = listOf("SB", "PA", "FF", "TG", "IC").filter { text.contains(it) }
+                    teamCodes = listOf("SB", "PA", "FF", "TG", "IC", "LBC").filter { text.contains(it) }
                 }
-                
-                println("Scraper: Processing game with teams: $teamCodes")
 
                 // 2. Location
                 val stadiumCol = content.selectFirst(".col_stadium")
-                // Usually "Stadium City @Time", we want the stadium/city part
                 val location = stadiumCol?.text()
                     ?.substringBefore("@")
                     ?.trim() ?: ""
@@ -68,7 +70,20 @@ class KtorScheduleScraper(
 
                 // 4. Status
                 val statusCol = content.selectFirst(".col_status")
-                val status = statusCol?.text()?.trim()
+                var status = statusCol?.text()?.trim()
+
+                // Check live score data
+                val homeCode = teamCodes.getOrNull(0) ?: ""
+                val awayCode = teamCodes.getOrNull(1) ?: ""
+                val scoreKey = "${isoDate}_${homeCode}_${awayCode}"
+                val altScoreKey = "${isoDate}_${awayCode}_${homeCode}"
+                val liveScoreInfo = scoresByDateAndTeams[scoreKey] ?: scoresByDateAndTeams[altScoreKey]
+
+                var homeScore: Int? = liveScoreInfo?.homePoints
+                var awayScore: Int? = liveScoreInfo?.awayPoints
+                if (liveScoreInfo?.status != null) {
+                    status = liveScoreInfo.status
+                }
 
                 // 5. YouTube URL
                 val watchCol = content.selectFirst(".col_watch")
@@ -78,10 +93,8 @@ class KtorScheduleScraper(
 
                 // If game is in the near future or Live, attempt to find direct stream link from the channel
                 if (status?.contains("Live", ignoreCase = true) == true || isWithinNextDays(date, 3)) {
-                    println("Scraper: Attempting deep discovery for upcoming stream at $youtubeUrl (Date: $date)")
                     enrichedMetadata = discoverEnrichedMetadata(youtubeUrl)
                     if (enrichedMetadata != null) {
-                        println("Scraper: Discovered direct stream: ${enrichedMetadata.directUrl}")
                         youtubeUrl = enrichedMetadata.directUrl
                     }
                 }
@@ -93,6 +106,8 @@ class KtorScheduleScraper(
                         time = time,
                         teamCodes = teamCodes,
                         youtubeUrl = youtubeUrl,
+                        homeScore = homeScore,
+                        awayScore = awayScore,
                         status = status,
                         thumbnailUrl = enrichedMetadata?.thumbnailUrl,
                         waitingCount = enrichedMetadata?.waitingCount,
@@ -105,19 +120,61 @@ class KtorScheduleScraper(
         return games
     }
 
+    private data class ScoreEntry(
+        val homePoints: Int,
+        val awayPoints: Int,
+        val status: String
+    )
+
+    private suspend fun fetchLiveGameScores(): Map<String, ScoreEntry> {
+        val map = mutableMapOf<String, ScoreEntry>()
+        try {
+            val response = httpClient.get("https://banana-stats-pages-seven.vercel.app/api/stats/games").bodyAsText()
+            val root = json.parseToJsonElement(response).jsonArray
+            for (elem in root) {
+                val obj = elem.jsonObject
+                val date = obj["date"]?.jsonPrimitive?.contentOrNull ?: continue
+                val rawStatus = obj["status"]?.jsonPrimitive?.contentOrNull ?: "final"
+                val displayStatus = when (rawStatus.lowercase()) {
+                    "in_progress", "live" -> "LIVE"
+                    "final", "complete" -> "Final"
+                    else -> "Scheduled"
+                }
+
+                val homeObj = obj["home_team"]?.jsonObject
+                val awayObj = obj["away_team"]?.jsonObject
+
+                val homeAbbr = homeObj?.get("abbreviation")?.jsonPrimitive?.contentOrNull ?: ""
+                val homeName = homeObj?.get("name")?.jsonPrimitive?.contentOrNull ?: ""
+                val homeCode = com.example.bananasball.data.repository.StaticTeamProvider.getCodeFromName(homeAbbr)
+                    ?: com.example.bananasball.data.repository.StaticTeamProvider.getCodeFromName(homeName) ?: ""
+
+                val awayAbbr = awayObj?.get("abbreviation")?.jsonPrimitive?.contentOrNull ?: ""
+                val awayName = awayObj?.get("name")?.jsonPrimitive?.contentOrNull ?: ""
+                val awayCode = com.example.bananasball.data.repository.StaticTeamProvider.getCodeFromName(awayAbbr)
+                    ?: com.example.bananasball.data.repository.StaticTeamProvider.getCodeFromName(awayName) ?: ""
+
+                val homePoints = homeObj?.get("points")?.jsonPrimitive?.intOrNull ?: 0
+                val awayPoints = awayObj?.get("points")?.jsonPrimitive?.intOrNull ?: 0
+
+                if (homeCode.isNotEmpty() && awayCode.isNotEmpty()) {
+                    val key = "${date}_${homeCode}_${awayCode}"
+                    map[key] = ScoreEntry(homePoints, awayPoints, displayStatus)
+                }
+            }
+        } catch (e: Exception) {
+            println("Scraper: Error fetching live scores: ${e.message}")
+        }
+        return map
+    }
+
     private suspend fun discoverEnrichedMetadata(channelUrl: String): EnrichedStreamMetadata? {
         return try {
             val html = httpClient.get(channelUrl).bodyAsText()
             
-            // 1. Find the videoId that is specifically associated with a "Live" or "Scheduled" stream.
-            // On a /streams page, this is often inside a "gridVideoRenderer" or "videoRenderer"
-            // specifically for upcoming/live content.
             val videoIdRegex = Regex("\"videoId\":\"([^\"]+)\"")
             val videoIdMatch = videoIdRegex.find(html)
             val videoId = videoIdMatch?.groupValues?.get(1) ?: return null
-
-            // 2. Parse the ytInitialPlayerResponse block for better data if we're on a direct video page
-            // But since we're on the /streams page, let's look for the specific renderer data
             
             val titleRegex = Regex("\"title\":\\{\"runs\":\\[\\{\"text\":\"([^\"]+)\"\\}\\]")
             val title = titleRegex.find(html)?.groupValues?.get(1)
@@ -154,7 +211,6 @@ class KtorScheduleScraper(
             val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
             val limit = today.plus(days, DateTimeUnit.DAY)
             
-            // Format check: "Thursday, August 20"
             val parts = dateStr.split(",").last().trim().split(" ")
             if (parts.size >= 2) {
                 val monthStr = parts[0].uppercase()
@@ -163,7 +219,6 @@ class KtorScheduleScraper(
                 val year = today.year
                 val parsedDate = LocalDate(year, month, dayVal)
                 
-                // Allow games from today until 'days' into the future
                 parsedDate in today..limit
             } else {
                 false
@@ -173,9 +228,6 @@ class KtorScheduleScraper(
         }
     }
 
-    /**
-     * Maps a team name (from alt text) to a standard two-letter team code.
-     */
     private fun nameToCode(name: String): String {
         return com.example.bananasball.data.repository.StaticTeamProvider.getCodeFromName(name) ?: run {
             val words = name.split(" ", "-", "_").filter { it.isNotEmpty() }
@@ -187,10 +239,6 @@ class KtorScheduleScraper(
         }
     }
 
-    /**
-     * Extracts the YouTube URL from the "Where to Watch" column or falls back
-     * to the official channel for the participating teams.
-     */
     private fun extractYoutubeUrl(watchCol: Element?, teamCodes: List<String>): String {
         val link = watchCol?.selectFirst("a")?.attr("href")
         if (link != null && (link.contains("youtube.com") || link.contains("youtu.be"))) {
@@ -202,5 +250,18 @@ class KtorScheduleScraper(
             ?: teamCodes.firstOrNull() ?: "SB"
 
         return com.example.bananasball.data.repository.StaticTeamProvider.getChannelUrl(matchedCode)
+    }
+
+    @OptIn(ExperimentalTime::class)
+    private fun parseDate(dateStr: String): LocalDate {
+        val parts = dateStr.split(",").last().trim().split(" ")
+        if (parts.size >= 2) {
+            val monthStr = parts[0].uppercase()
+            val day = parts[1].toInt()
+            val month = Month.valueOf(monthStr)
+            val year = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year
+            return LocalDate(year, month, day)
+        }
+        return Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
     }
 }
