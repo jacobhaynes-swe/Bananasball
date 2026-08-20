@@ -1,12 +1,12 @@
 # Bananasball 🍌⚾️
 
-A professional-ish fan app for the **Banana Ball** league, built with **Kotlin Multiplatform** and **Compose Multiplatform**.
+A professional-ish fan app for the **Banana Ball** league, allowing fans to quickly watch backflip catches and all the other yellow ball antics.
 
-![Schedule View](docs/screenshots/schedule_view.png)
+<img src="docs/screenshots/schedule_view.png" width="400" alt="Schedule View">
 
 ## Features
 
-- **Live Schedule**: Scraped directly from the Savannah Bananas official website.
+- **Live Schedule**: Scraped directly from the [Savannah Bananas official website](https://thesavannahbananas.com/schedule/).
 - **Deep Stream Discovery**: Automatically finds and links directly to scheduled or live YouTube streams for games happening today or in the near future.
 - **One-Click Watch**: Launches the official YouTube app directly to the stream.
 - **Offline First**: All schedule data is cached locally using **Room KMP**.
