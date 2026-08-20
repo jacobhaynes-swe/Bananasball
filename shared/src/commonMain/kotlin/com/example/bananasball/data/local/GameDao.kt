@@ -1,0 +1,16 @@
+package com.example.bananasball.data.local
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface GameDao {
+    @Query("SELECT * FROM games WHERE date = :date")
+    fun getGamesByDate(date: String): Flow<List<GameEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGames(games: List<GameEntity>)
+}

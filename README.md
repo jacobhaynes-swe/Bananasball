@@ -1,1 +1,2 @@
-# Bananasball\nProfessional fan app for the Banana Ball league.
+# Bananasball
+A Professional-ish fan app for the Banana Ball league.
