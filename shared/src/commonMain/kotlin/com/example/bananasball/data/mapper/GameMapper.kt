@@ -40,12 +40,26 @@ fun GameEntity.toDomain(): Game {
         awayTeam = away,
         startTime = LocalDateTime.parse(startTime),
         youtubeUrl = youtubeUrl ?: fallbackHome?.youtubeChannelUrl ?: fallbackAway?.youtubeChannelUrl,
-        boxScore = BoxScore(awayScore = awayScore, homeScore = homeScore, status = status),
+        boxScore = BoxScore(
+            awayScore = awayScore,
+            homeScore = homeScore,
+            status = status,
+            awayRuns = awayRuns,
+            homeRuns = homeRuns,
+            awayHits = awayHits,
+            homeHits = homeHits,
+            currentInning = currentInning,
+            inningHalf = inningHalf,
+            outs = outs,
+            inningDisplay = inningDisplay
+        ),
         location = location,
         streamingMetadata = StreamingMetadata(
             thumbnailUrl = thumbnailUrl,
             waitingCount = waitingCount,
-            actualStartTime = actualStartTime?.let { LocalDateTime.parse(it) },
+            viewerCount = viewerCount,
+            isLiveBroadcast = isLiveBroadcast,
+            actualStartTime = actualStartTime?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() },
             streamTitle = streamTitle
         )
     )
@@ -62,7 +76,14 @@ fun ScrapedGame.toEntity(): GameEntity {
     val parsedDate = parseDate(date)
     val isoDate = parsedDate.toString()
     
-    val parsedStartTime = parseGameDateTime(date, time, actualStartTime)
+    val parsedGameStartTime = parseGameDateTime(date, time, null)
+    val parsedStreamStartTime = actualStartTime?.toLongOrNull()?.let { seconds ->
+        runCatching {
+            Instant.fromEpochSeconds(seconds)
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .toString()
+        }.getOrNull()
+    }
 
     return GameEntity(
         id = "${isoDate}_${homeCode}_${awayCode}",
@@ -72,17 +93,27 @@ fun ScrapedGame.toEntity(): GameEntity {
         awayTeamId = awayCode,
         awayTeamName = awayTeam?.name ?: "Team $awayCode",
         awayTeamShort = awayTeam?.shortName ?: awayCode,
-        startTime = parsedStartTime,
+        startTime = parsedGameStartTime,
         youtubeUrl = youtubeUrl ?: homeTeam?.youtubeChannelUrl ?: awayTeam?.youtubeChannelUrl,
         awayScore = awayScore ?: 0,
         homeScore = homeScore ?: 0,
         status = status ?: "Scheduled",
-        location = location,
+        location = if (location.isNotBlank()) location else "${homeTeam?.name ?: "Banana Ball"} Ballpark",
         date = isoDate,
         thumbnailUrl = thumbnailUrl,
         waitingCount = waitingCount,
-        actualStartTime = parsedStartTime,
-        streamTitle = streamTitle
+        viewerCount = viewerCount,
+        isLiveBroadcast = isLiveBroadcast,
+        actualStartTime = parsedStreamStartTime,
+        streamTitle = streamTitle,
+        awayRuns = awayRuns,
+        homeRuns = homeRuns,
+        awayHits = awayHits,
+        homeHits = homeHits,
+        currentInning = currentInning,
+        inningHalf = inningHalf,
+        outs = outs,
+        inningDisplay = inningDisplay
     )
 }
 
@@ -91,7 +122,6 @@ fun ScrapedGame.toEntity(): GameEntity {
  */
 @OptIn(ExperimentalTime::class)
 fun parseGameDateTime(dateStr: String, timeStr: String, actualStartTimeSeconds: String?): String {
-    // 1. Exact Unix timestamp from YouTube scheduled live stream
     actualStartTimeSeconds?.toLongOrNull()?.let { seconds ->
         return Instant.fromEpochSeconds(seconds)
             .toLocalDateTime(TimeZone.currentSystemDefault())
@@ -100,30 +130,27 @@ fun parseGameDateTime(dateStr: String, timeStr: String, actualStartTimeSeconds: 
 
     val parsedDate = parseDate(dateStr)
 
-    // 2. Parse timeStr (e.g., "7:00pm MST", "7:00 PM EST", "1:30 PM CST", "7:00pm")
-    val timeRegex = Regex("(\\d{1,2}):(\\d{2})\\s*([aApP][mM])?\\s*([A-Za-z]+)?")
+    val timeRegex = Regex("(\\d{1,2}):(\\d{2})(:\\d{2})?\\s*([aApP][mM])?\\s*([A-Za-z/_]+)?")
     val match = timeRegex.find(timeStr)
 
     if (match != null) {
         var hour = match.groupValues[1].toInt()
         val minute = match.groupValues[2].toInt()
-        val amPm = match.groupValues[3].uppercase()
-        val tzStr = match.groupValues[4].uppercase()
+        val amPm = match.groupValues[4].uppercase()
+        val tzStr = match.groupValues[5].trim()
 
         if (amPm == "PM" && hour < 12) {
             hour += 12
         } else if (amPm == "AM" && hour == 12) {
             hour = 0
-        } else if (amPm.isEmpty() && hour < 12 && hour in 1..8) {
-            // Default to evening game
-            hour += 12
         }
 
-        val gameZone = when (tzStr) {
-            "EST", "EDT", "ET" -> TimeZone.of("America/New_York")
-            "CST", "CDT", "CT" -> TimeZone.of("America/Chicago")
-            "MST", "MDT", "MT" -> TimeZone.of("America/Denver")
-            "PST", "PDT", "PT" -> TimeZone.of("America/Los_Angeles")
+        val gameZone = when {
+            tzStr.contains("Denver", ignoreCase = true) || tzStr.equals("MST", true) || tzStr.equals("MDT", true) || tzStr.equals("MT", true) -> TimeZone.of("America/Denver")
+            tzStr.contains("Chicago", ignoreCase = true) || tzStr.equals("CST", true) || tzStr.equals("CDT", true) || tzStr.equals("CT", true) -> TimeZone.of("America/Chicago")
+            tzStr.contains("New_York", ignoreCase = true) || tzStr.equals("EST", true) || tzStr.equals("EDT", true) || tzStr.equals("ET", true) -> TimeZone.of("America/New_York")
+            tzStr.contains("Los_Angeles", ignoreCase = true) || tzStr.equals("PST", true) || tzStr.equals("PDT", true) || tzStr.equals("PT", true) -> TimeZone.of("America/Los_Angeles")
+            tzStr.isNotBlank() && runCatching { TimeZone.of(tzStr) }.isSuccess -> TimeZone.of(tzStr)
             else -> TimeZone.of("America/New_York")
         }
 
@@ -136,7 +163,6 @@ fun parseGameDateTime(dateStr: String, timeStr: String, actualStartTimeSeconds: 
         }
     }
 
-    // Default 7:00 PM Eastern
     val defaultEastern = LocalDateTime(parsedDate.year, parsedDate.month, parsedDate.day, 19, 0)
     return try {
         val instant = defaultEastern.toInstant(TimeZone.of("America/New_York"))
@@ -147,17 +173,19 @@ fun parseGameDateTime(dateStr: String, timeStr: String, actualStartTimeSeconds: 
 }
 
 /**
- * Parses a date string like "Thursday, August 20" into a LocalDate.
- * Assumes the current year.
+ * Parses a date string like "Thursday, August 20" or "2026-08-20" into a LocalDate.
  */
 @OptIn(ExperimentalTime::class)
-private fun parseDate(dateStr: String): LocalDate {
+fun parseDate(dateStr: String): LocalDate {
     try {
+        if (dateStr.contains("-")) {
+            return LocalDate.parse(dateStr.trim())
+        }
         val parts = dateStr.split(",").last().trim().split(" ")
         if (parts.size >= 2) {
-            val monthStr = parts[0]
+            val monthStr = parts[0].uppercase()
             val day = parts[1].toInt()
-            val month = Month.valueOf(monthStr.uppercase())
+            val month = Month.valueOf(monthStr)
             val year = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year
             return LocalDate(year, month, day)
         }

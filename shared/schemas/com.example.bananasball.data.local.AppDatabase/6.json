@@ -1,0 +1,298 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 6,
+    "identityHash": "7824fa898286cdbf9a42513d3138610e",
+    "entities": [
+      {
+        "tableName": "games",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `homeTeamId` TEXT NOT NULL, `homeTeamName` TEXT NOT NULL, `homeTeamShort` TEXT NOT NULL, `awayTeamId` TEXT NOT NULL, `awayTeamName` TEXT NOT NULL, `awayTeamShort` TEXT NOT NULL, `startTime` TEXT NOT NULL, `youtubeUrl` TEXT, `awayScore` INTEGER NOT NULL, `homeScore` INTEGER NOT NULL, `status` TEXT NOT NULL, `location` TEXT NOT NULL, `date` TEXT NOT NULL, `thumbnailUrl` TEXT, `waitingCount` INTEGER, `viewerCount` INTEGER, `isLiveBroadcast` INTEGER NOT NULL, `actualStartTime` TEXT, `streamTitle` TEXT, `awayRuns` INTEGER, `homeRuns` INTEGER, `awayHits` INTEGER, `homeHits` INTEGER, `currentInning` INTEGER, `inningHalf` TEXT, `outs` INTEGER, `inningDisplay` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "homeTeamId",
+            "columnName": "homeTeamId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "homeTeamName",
+            "columnName": "homeTeamName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "homeTeamShort",
+            "columnName": "homeTeamShort",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "awayTeamId",
+            "columnName": "awayTeamId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "awayTeamName",
+            "columnName": "awayTeamName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "awayTeamShort",
+            "columnName": "awayTeamShort",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startTime",
+            "columnName": "startTime",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "youtubeUrl",
+            "columnName": "youtubeUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "awayScore",
+            "columnName": "awayScore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "homeScore",
+            "columnName": "homeScore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "location",
+            "columnName": "location",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "thumbnailUrl",
+            "columnName": "thumbnailUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "waitingCount",
+            "columnName": "waitingCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "viewerCount",
+            "columnName": "viewerCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isLiveBroadcast",
+            "columnName": "isLiveBroadcast",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualStartTime",
+            "columnName": "actualStartTime",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "streamTitle",
+            "columnName": "streamTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "awayRuns",
+            "columnName": "awayRuns",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "homeRuns",
+            "columnName": "homeRuns",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "awayHits",
+            "columnName": "awayHits",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "homeHits",
+            "columnName": "homeHits",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "currentInning",
+            "columnName": "currentInning",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "inningHalf",
+            "columnName": "inningHalf",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "outs",
+            "columnName": "outs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "inningDisplay",
+            "columnName": "inningDisplay",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "teams",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `shortName` TEXT NOT NULL, `logoUrl` TEXT, `primaryColorHex` TEXT, `secondaryColorHex` TEXT, `rosterUrl` TEXT, `websiteUrl` TEXT, `youtubeChannelUrl` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "shortName",
+            "columnName": "shortName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "logoUrl",
+            "columnName": "logoUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "primaryColorHex",
+            "columnName": "primaryColorHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "secondaryColorHex",
+            "columnName": "secondaryColorHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rosterUrl",
+            "columnName": "rosterUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "websiteUrl",
+            "columnName": "websiteUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "youtubeChannelUrl",
+            "columnName": "youtubeChannelUrl",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "standings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`teamId` TEXT NOT NULL, `rank` INTEGER NOT NULL, `wins` INTEGER NOT NULL, `losses` INTEGER NOT NULL, `winPercentage` REAL NOT NULL, `gamesBehind` REAL NOT NULL, `streak` TEXT, `runDifferential` INTEGER NOT NULL, PRIMARY KEY(`teamId`))",
+        "fields": [
+          {
+            "fieldPath": "teamId",
+            "columnName": "teamId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rank",
+            "columnName": "rank",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wins",
+            "columnName": "wins",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "losses",
+            "columnName": "losses",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "winPercentage",
+            "columnName": "winPercentage",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gamesBehind",
+            "columnName": "gamesBehind",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "streak",
+            "columnName": "streak",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "runDifferential",
+            "columnName": "runDifferential",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "teamId"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7824fa898286cdbf9a42513d3138610e')"
+    ]
+  }
+}

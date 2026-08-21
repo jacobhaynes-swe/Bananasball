@@ -11,4 +11,3 @@ data class Team(
     val websiteUrl: String? = null,
     val youtubeChannelUrl: String? = null
 )
-
