@@ -103,3 +103,52 @@ Base URL: `https://banana-stats-pages-seven.vercel.app`
    - `Player`: Full statistical model mapping batting, pitching, and showdown metrics.
    - `GameDetail`: Comprehensive model encapsulating `BoxScore`, `Lineup`, `BullpenLog`, and `FieldingStats`.
    - `PlayoffPicture`: Domain entity resolving tiebreakers and seeding buckets.
+
+---
+
+## 🌐 Ecosystem Crawl & Social Intelligence Engine
+
+### 1. Official Team Social Registry
+Every Banana Ball franchise maintains distinct, official channels across YouTube, Instagram, TikTok, and X (Twitter):
+
+| Franchise | YouTube Channel | Instagram | TikTok | X (Twitter) |
+|---|---|---|---|---|
+| **Savannah Bananas** | `@TheSavannahBananas` | `@thesavbananas` | `@thesavbananas` | `@TheSavBananas` |
+| **Party Animals** | `@thepartyanimals` | `@thepartyanimals` | `@theofficialpartyanimals` | `@theprtyanimals` |
+| **The Firefighters** | `@TheOfficialFirefighters` | `@thefirefightersbb` | `@theofficialfirefighters` | — |
+| **Texas Tailgaters** | `@TheTexasTailgaters` | `@thetexastailgaters` | `@thetexastailgaters` | — |
+| **Indianapolis Clowns**| `@indianapolisclowns` | `@theindianapolisclowns` | — | — |
+| **Loco Beach Coconuts**| `@locobeachcoconuts` | `@locobeachcoconuts` | — | — |
+| **Banana Ball League** | `@officialbananaball` | `@bananaball` | `@officialbananaball` | — |
+
+---
+
+### 2. Zero-Auth Live Social Feed Architecture
+To power the upcoming **Socials Tab** with strict deduplication (no repeated videos, shorts, or clips across platforms):
+
+1. **Scraping Pipeline (Videos & Shorts)**:
+   - **Endpoint**: `https://www.youtube.com/{handle}/videos` and `https://www.youtube.com/{handle}/shorts`
+   - **Extractor**: Parse `ytInitialData` JSON (`lockupViewModel` hierarchy) to extract:
+     - `id` (YouTube Video ID / Short ID)
+     - `title`
+     - `thumbnailUrl`
+     - `views` (e.g. `"48K views"`)
+     - `publishedTime` (e.g. `"1 month ago"`, `"2 days ago"`)
+     - `duration` / `contentType` (`VIDEO` vs `SHORT`)
+
+2. **Deduplication Engine**:
+   - Primary Key: `content_id` (e.g. `yt_w9dqiv8Qpzk`).
+   - Normalization Hash: `SHA-256(team_id + normalized_title)`.
+   - If a clip is published as both a short and an announcement, the deduplication engine retains the highest-resolution stream item.
+
+3. **Favorite Team Social Aggregator**:
+   - Filter by user's selected `favoriteTeamId`.
+   - Unified chronological feed supporting direct playback in-app or launching to the native app/browser.
+
+---
+
+### 3. WordPress REST APIs & Media Backends
+- `https://bananaball.com/wp-json/wp/v2/event`: Official schedule events and tour dates.
+- `https://bananaball.com/wp-json/wp/v2/team`: Official team lore, rosters, and ACF custom metadata.
+- `https://bananaball.com/wp-json/wp/v2/bb_gallery`: Photo galleries and highlight media items.
+
