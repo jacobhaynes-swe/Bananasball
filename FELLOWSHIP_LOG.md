@@ -56,4 +56,6 @@
 - feat(ci): add automated GitHub Actions APK release pipeline (`.github/workflows/release.yml`) for tag-driven builds
 - docs(readme): embed 3-view framed screenshot showcase gallery and prominent Download APK badge with sideload guide
 - release: prepare v1.0.0 public beta release with automated asset distribution
+- feat(icon): generate and configure custom yellow baseball adaptive launcher icon across all mipmap density buckets
+- release: publish v1.0.1 public release with custom app launcher branding
 
