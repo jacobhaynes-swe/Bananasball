@@ -8,37 +8,37 @@ A professional-ish fan app for the **Banana Ball** league, allowing fans to quic
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
-### 📡 Real-Time Stream Discovery & Live Viewers
+### Real-Time Stream Discovery & Live Viewers
 - **Deep YouTube Broadcast Discovery**: Automatically scans official team channels (Savannah Bananas, Party Animals, Firefighters, Texas Tailgaters, and more) to extract direct stream watch links and broadcast thumbnails.
 - **Dynamic Viewership Badges**: Displays pre-game waiting counters (`🔥 X waiting`) and live audience counters (`🔴 5.7K watching`) directly on match cards.
 - **One-Click Launch**: Opens live broadcasts directly in the native YouTube app or browser.
 
-### ⚾️ Live Game Scorecard & Banana Ball Scorebug
+### Live Game Scorecard & Banana Ball Scorebug
 - **Banana Ball Scoring**: Tracks both inning-by-inning points (`PTS`) and cumulative game action (`Runs` & `Hits`).
 - **2-Hour Game Clock**: Live, second-by-second countdown clock counting down from the official Banana Ball 2-hour hard time limit.
 - **Dual-Time Display**: Separates Game Start (First Pitch) from Stream Broadcast start times, converted accurately from venue timezones (MST, EDT, CDT) to local device time.
 - **Pulsing Live Status**: Dynamic pulsing indicators for games currently in progress.
 
-### 📅 Interactive Schedule & Calendar Navigation
+### Interactive Schedule & Calendar Navigation
 - **Dynamic Date Ribbon**: Quick horizontal date picker ribbon to browse adjacent days.
 - **Full Season Calendar**: Material 3 DatePickerDialog to jump to any date across the entire world tour.
 - **Pull-to-Refresh & Adaptive Polling**: Automatically refreshes live games every 45 seconds while viewing active game days.
 
-### 📊 League Standings & Leaderboards
+### League Standings & Leaderboards
 - **Official Directus API Integration**: Live standings tracking Wins, Losses, Win Percentage, Run Differential, Points, and Trick Plays.
 - **Batting & Pitching Leaders**: Comprehensive leaderboards for Batting Average, Home Runs, RBIs, Stolen Bases, ERA, Strikeouts, and Wins.
 
-### 🧢 Teams & Stadium Hub
+### Teams & Stadium Hub
 - Explore all Banana Ball teams, official colors, home venues, and quick links to team channels.
 
-### 🌓 Midnight Dark Theme
+### Midnight Dark Theme
 - Tailored Material 3 dark theme with deep midnight surfaces (`#0B1120`), high-contrast slate cards (`#1E293B`), and Savannah Banana yellow accents (`#FFE000`).
 
 ---
 
-## 🏗 Architecture & Tech Stack
+## Architecture & Tech Stack
 
 Built following the **Tube / Socket / Grid** architecture for Kotlin Multiplatform:
 
@@ -50,7 +50,7 @@ Built following the **Tube / Socket / Grid** architecture for Kotlin Multiplatfo
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Android Studio Ladybug / Meerkat or IntelliJ IDEA with KMP plugin
@@ -68,7 +68,7 @@ Built following the **Tube / Socket / Grid** architecture for Kotlin Multiplatfo
 
 ---
 
-## 📜 Open Source & Disclaimer
+## Open Source & Disclaimer
 
 This project is licensed under the **Apache License 2.0**.
 
