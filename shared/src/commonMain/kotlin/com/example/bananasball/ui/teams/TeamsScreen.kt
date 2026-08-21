@@ -77,7 +77,7 @@ fun TeamCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column {
@@ -96,9 +96,9 @@ fun TeamCard(
                 ) {
                     // Logo Surface
                     Surface(
-                        modifier = Modifier.size(56.dp),
+                        modifier = Modifier.size(52.dp),
                         shape = CircleShape,
-                        color = Color(0xFFF1F5F9)
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         if (team.logoUrl != null) {
                             AsyncImage(
@@ -108,7 +108,12 @@ fun TeamCard(
                             )
                         } else {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(team.shortName.take(1), fontWeight = FontWeight.Black, fontSize = 20.sp)
+                                Text(
+                                    text = team.shortName.take(1),
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 20.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             }
                         }
                     }
@@ -120,26 +125,26 @@ fun TeamCard(
                             text = team.name,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.height(2.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = primaryColor.copy(alpha = 0.15f)
+                                color = primaryColor.copy(alpha = 0.2f)
                             ) {
                                 Text(
                                     text = team.id,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.secondary,
+                                    color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = team.shortName,
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 13.sp
                             )
                         }
@@ -188,7 +193,12 @@ fun TeamCard(
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                         ) {
-                            Text("🌐 SITE", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text(
+                                text = "🌐 SITE",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
                 }

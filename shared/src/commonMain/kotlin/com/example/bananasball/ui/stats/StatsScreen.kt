@@ -103,20 +103,20 @@ fun StandingsTab(standings: List<TeamStandings>, modifier: Modifier = Modifier) 
         // Table Header
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFE2E8F0)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("#", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(28.dp), color = Color(0xFF475569))
-                    Text("TEAM", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), color = Color(0xFF475569))
-                    Text("W", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End, color = Color(0xFF475569))
-                    Text("L", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End, color = Color(0xFF475569))
-                    Text("PCT", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End, color = Color(0xFF475569))
-                    Text("GB", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End, color = Color(0xFF475569))
-                    Text("STRK", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End, color = Color(0xFF475569))
+                    Text("#", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(28.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("TEAM", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("W", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("L", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("PCT", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("GB", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("STRK", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -125,7 +125,7 @@ fun StandingsTab(standings: List<TeamStandings>, modifier: Modifier = Modifier) 
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Row(
@@ -138,9 +138,9 @@ fun StandingsTab(standings: List<TeamStandings>, modifier: Modifier = Modifier) 
                         shape = CircleShape,
                         color = when (item.rank) {
                             1 -> MaterialTheme.colorScheme.primary
-                            2 -> Color(0xFFCBD5E1)
-                            3 -> Color(0xFFE2E8F0)
-                            else -> Color(0xFFF1F5F9)
+                            2 -> MaterialTheme.colorScheme.surfaceVariant
+                            3 -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -148,7 +148,7 @@ fun StandingsTab(standings: List<TeamStandings>, modifier: Modifier = Modifier) 
                                 text = item.rank.toString(),
                                 fontWeight = FontWeight.Black,
                                 fontSize = 12.sp,
-                                color = if (item.rank == 1) Color.Black else Color(0xFF334155)
+                                color = if (item.rank == 1) Color.Black else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -160,7 +160,7 @@ fun StandingsTab(standings: List<TeamStandings>, modifier: Modifier = Modifier) 
                         Surface(
                             modifier = Modifier.size(32.dp),
                             shape = CircleShape,
-                            color = Color(0xFFF8FAFC)
+                            color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             if (item.team.logoUrl != null) {
                                 AsyncImage(
@@ -170,21 +170,62 @@ fun StandingsTab(standings: List<TeamStandings>, modifier: Modifier = Modifier) 
                                 )
                             } else {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(item.team.shortName.take(1), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(
+                                        text = item.team.shortName.take(1),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
                             }
                         }
                         Spacer(Modifier.width(8.dp))
                         Column {
-                            Text(item.team.name, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
-                            Text(item.team.shortName, color = Color.Gray, fontSize = 10.sp)
+                            Text(
+                                text = item.team.name,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = item.team.shortName,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 10.sp
+                            )
                         }
                     }
 
-                    Text(item.wins.toString(), fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text(item.losses.toString(), color = Color.Gray, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.End)
-                    Text(formatWinPct(item.winPercentage), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
-                    Text(if (item.gamesBehind == 0.0) "-" else item.gamesBehind.toString(), color = Color.Gray, fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+                    Text(
+                        text = item.wins.toString(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        modifier = Modifier.width(28.dp),
+                        textAlign = TextAlign.End,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = item.losses.toString(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        modifier = Modifier.width(28.dp),
+                        textAlign = TextAlign.End
+                    )
+                    Text(
+                        text = formatWinPct(item.winPercentage),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        modifier = Modifier.width(44.dp),
+                        textAlign = TextAlign.End,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (item.gamesBehind == 0.0) "-" else item.gamesBehind.toString(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        modifier = Modifier.width(36.dp),
+                        textAlign = TextAlign.End
+                    )
 
                     // Streak badge
                     val streak = item.streak ?: "-"
@@ -192,13 +233,13 @@ fun StandingsTab(standings: List<TeamStandings>, modifier: Modifier = Modifier) 
                     Surface(
                         modifier = Modifier.width(44.dp),
                         shape = RoundedCornerShape(4.dp),
-                        color = if (isWinStreak) Color(0xFFDCFCE7) else Color(0xFFFEE2E2)
+                        color = if (isWinStreak) Color(0xFF166534).copy(alpha = 0.2f) else Color(0xFF991B1B).copy(alpha = 0.2f)
                     ) {
                         Text(
                             text = streak,
                             fontWeight = FontWeight.Bold,
                             fontSize = 10.sp,
-                            color = if (isWinStreak) Color(0xFF166534) else Color(0xFF991B1B),
+                            color = if (isWinStreak) Color(0xFF22C55E) else Color(0xFFEF4444),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(vertical = 2.dp)
                         )
@@ -220,7 +261,7 @@ fun BattingLeadersTab(leaders: List<StatLeader.Batting>, modifier: Modifier = Mo
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(Modifier.padding(14.dp)) {
@@ -233,20 +274,25 @@ fun BattingLeadersTab(leaders: List<StatLeader.Batting>, modifier: Modifier = Mo
                             Surface(
                                 modifier = Modifier.size(28.dp),
                                 shape = CircleShape,
-                                color = if (leader.rank == 1) MaterialTheme.colorScheme.primary else Color(0xFFF1F5F9)
+                                color = if (leader.rank == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
                                         text = "#${leader.rank}",
                                         fontWeight = FontWeight.Black,
                                         fontSize = 12.sp,
-                                        color = if (leader.rank == 1) Color.Black else Color(0xFF475569)
+                                        color = if (leader.rank == 1) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                             Spacer(Modifier.width(10.dp))
                             Column {
-                                Text(leader.player, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text(
+                                    text = leader.player,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     if (leader.team.logoUrl != null) {
                                         AsyncImage(
@@ -256,7 +302,11 @@ fun BattingLeadersTab(leaders: List<StatLeader.Batting>, modifier: Modifier = Mo
                                         )
                                         Spacer(Modifier.width(4.dp))
                                     }
-                                    Text(leader.team.name, color = Color.Gray, fontSize = 11.sp)
+                                    Text(
+                                        text = leader.team.name,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
                                 }
                             }
                         }
@@ -267,17 +317,22 @@ fun BattingLeadersTab(leaders: List<StatLeader.Batting>, modifier: Modifier = Mo
                                 text = formatAvg(leader.avg),
                                 fontWeight = FontWeight.Black,
                                 fontSize = 22.sp,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = MaterialTheme.colorScheme.primary
                             )
-                            Text("BATTING AVG", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "BATTING AVG",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 
                     Spacer(Modifier.height(12.dp))
-                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     Spacer(Modifier.height(10.dp))
 
-                    // Secondary Stats Row (Banana Ball style: HR, RBI, OPS, B4S, SB)
+                    // Secondary Stats Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -305,7 +360,7 @@ fun PitchingLeadersTab(leaders: List<StatLeader.Pitching>, modifier: Modifier = 
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(Modifier.padding(14.dp)) {
@@ -318,20 +373,25 @@ fun PitchingLeadersTab(leaders: List<StatLeader.Pitching>, modifier: Modifier = 
                             Surface(
                                 modifier = Modifier.size(28.dp),
                                 shape = CircleShape,
-                                color = if (leader.rank == 1) MaterialTheme.colorScheme.primary else Color(0xFFF1F5F9)
+                                color = if (leader.rank == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
                                         text = "#${leader.rank}",
                                         fontWeight = FontWeight.Black,
                                         fontSize = 12.sp,
-                                        color = if (leader.rank == 1) Color.Black else Color(0xFF475569)
+                                        color = if (leader.rank == 1) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                             Spacer(Modifier.width(10.dp))
                             Column {
-                                Text(leader.player, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text(
+                                    text = leader.player,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     if (leader.team.logoUrl != null) {
                                         AsyncImage(
@@ -341,7 +401,11 @@ fun PitchingLeadersTab(leaders: List<StatLeader.Pitching>, modifier: Modifier = 
                                         )
                                         Spacer(Modifier.width(4.dp))
                                     }
-                                    Text(leader.team.name, color = Color.Gray, fontSize = 11.sp)
+                                    Text(
+                                        text = leader.team.name,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
                                 }
                             }
                         }
@@ -352,14 +416,19 @@ fun PitchingLeadersTab(leaders: List<StatLeader.Pitching>, modifier: Modifier = 
                                 text = formatDecimal(leader.era),
                                 fontWeight = FontWeight.Black,
                                 fontSize = 22.sp,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = MaterialTheme.colorScheme.primary
                             )
-                            Text("EARNED RUN AVG", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "EARNED RUN AVG",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 
                     Spacer(Modifier.height(12.dp))
-                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     Spacer(Modifier.height(10.dp))
 
                     // Pitching stats row
@@ -382,8 +451,18 @@ fun PitchingLeadersTab(leaders: List<StatLeader.Pitching>, modifier: Modifier = 
 @Composable
 fun StatBox(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        Text(label, color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        Text(
+            text = value,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 

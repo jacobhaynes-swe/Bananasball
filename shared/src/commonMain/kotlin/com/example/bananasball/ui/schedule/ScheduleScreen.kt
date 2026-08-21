@@ -1,12 +1,13 @@
 package com.example.bananasball.ui.schedule
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -14,10 +15,10 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -27,14 +28,106 @@ import kotlin.time.Instant
 import kotlin.time.ExperimentalTime
 import kotlinx.datetime.*
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalTime::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleScreen(
     viewModel: ScheduleViewModel,
-    onWatchLive: (String) -> Unit
+    onWatchLive: (String) -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     var showDatePicker by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "BANANASBALL",
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFFFFE000),
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally)
+                    )
+                },
+                actions = {
+                    IconButton(onClick = { showDatePicker = true }) {
+                        Text("📅", fontSize = 20.sp)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = Color(0xFFFFE000)
+                )
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            DateRibbon(
+                selectedDate = state.selectedDate,
+                onDateSelected = { viewModel.handleIntent(ScheduleIntent.OnDateSelected(it)) }
+            )
+
+            PullToRefreshBox(
+                isRefreshing = state.isLoading,
+                onRefresh = { viewModel.handleIntent(ScheduleIntent.OnRefresh) },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (state.games.isEmpty() && !state.isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(32.dp).fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("🍌", fontSize = 48.sp)
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    text = "No Games Scheduled",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = "Check adjacent dates on the ribbon or use the calendar picker.",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(state.games, key = { it.id }) { game ->
+                            GameCard(game = game, onWatchLive = onWatchLive)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
@@ -43,148 +136,60 @@ fun ScheduleScreen(
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val picked = Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.UTC).date
-                        viewModel.handleIntent(ScheduleIntent.OnDateSelected(picked))
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val selectedInstant = Instant.fromEpochMilliseconds(millis)
+                            val selectedLocalDate = selectedInstant.toLocalDateTime(TimeZone.UTC).date
+                            viewModel.handleIntent(ScheduleIntent.OnDateSelected(selectedLocalDate))
+                        }
+                        showDatePicker = false
                     }
-                    showDatePicker = false
-                }) {
-                    Text("Select", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Text("OK", color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel", color = Color.Gray)
+                    Text("Cancel")
                 }
             }
         ) {
             DatePicker(state = datePickerState)
         }
     }
-
-    Scaffold(
-        topBar = {
-            Column(Modifier.background(MaterialTheme.colorScheme.secondary)) {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            text = "BANANASBALL",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 2.sp
-                        )
-                    },
-                    actions = {
-                        IconButton(
-                            onClick = { showDatePicker = true },
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text("📅", fontSize = 16.sp)
-                                }
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
-                )
-                DateRibbon(
-                    selectedDate = state.selectedDate,
-                    onDateSelected = { viewModel.handleIntent(ScheduleIntent.OnDateSelected(it)) }
-                )
-            }
-        }
-    ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = state.isLoading,
-            onRefresh = { viewModel.handleIntent(ScheduleIntent.OnRefresh) },
-            modifier = Modifier.fillMaxSize().padding(padding)
-        ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(state.games) { game ->
-                    GameCard(
-                        game = game,
-                        onWatchLive = onWatchLive
-                    )
-                }
-                
-                if (state.games.isEmpty() && !state.isLoading) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White)
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("🍌", fontSize = 40.sp)
-                                Spacer(Modifier.height(12.dp))
-                                Text(
-                                    text = "No Games Scheduled",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    text = "Check adjacent dates on the ribbon or use the calendar picker.",
-                                    color = Color.Gray,
-                                    fontSize = 13.sp,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
+@OptIn(ExperimentalTime::class)
 @Composable
 fun DateRibbon(
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit
 ) {
+    val scrollState = rememberScrollState()
+    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
     val dates = remember(selectedDate) {
-        val start = selectedDate.plus(-10, DateTimeUnit.DAY)
-        (0..20).map { start.plus(it, DateTimeUnit.DAY) }
-    }
-
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = 8)
-
-    LaunchedEffect(selectedDate) {
-        val index = dates.indexOf(selectedDate)
-        if (index >= 0) {
-            listState.animateScrollToItem((index - 2).coerceAtLeast(0))
+        (-2..7).map { offset ->
+            selectedDate.plus(offset, DateTimeUnit.DAY)
         }
     }
 
-    LazyRow(
-        state = listState,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .horizontalScroll(scrollState)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(dates) { date ->
+        dates.forEach { date ->
             val isSelected = date == selectedDate
             Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f))
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (isSelected) Color(0xFFFFE000) else Color.White.copy(alpha = 0.15f)
+                    )
                     .clickable { onDateSelected(date) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -211,31 +216,60 @@ fun GameCard(
     game: Game,
     onWatchLive: (String) -> Unit
 ) {
+    val isLiveGame = game.boxScore.status.equals("Live", ignoreCase = true) || 
+                     (game.streamingMetadata?.isLiveBroadcast == true)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column {
-            // YouTube Thumbnail if available
+            // YouTube Thumbnail Banner if available
             game.streamingMetadata?.thumbnailUrl?.let { thumbUrl ->
-                Box(Modifier.fillMaxWidth().height(180.dp)) {
+                Box(Modifier.fillMaxWidth().height(150.dp)) {
                     AsyncImage(
                         model = thumbUrl,
-                        contentDescription = "Game Thumbnail",
+                        contentDescription = "Game Broadcast Thumbnail",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
-                    // Hype Count badge
-                    game.streamingMetadata.waitingCount?.let { count ->
+                    
+                    // Live Viewers or Pre-game Waiting Badge
+                    val isLiveBroadcast = game.streamingMetadata.isLiveBroadcast || isLiveGame
+                    val viewerCount = game.streamingMetadata.viewerCount
+                    val waitingCount = game.streamingMetadata.waitingCount
+
+                    if (isLiveBroadcast) {
+                        val countText = when {
+                            viewerCount != null && viewerCount >= 1000 -> "${((viewerCount / 100.0).toInt() / 10.0)}K watching"
+                            viewerCount != null -> "$viewerCount watching"
+                            else -> "LIVE NOW"
+                        }
+                        Surface(
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                            color = Color(0xFFCC0000).copy(alpha = 0.9f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "🔴 $countText",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    } else if (waitingCount != null) {
                         Surface(
                             modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
                             color = Color.Black.copy(alpha = 0.75f),
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = "🔥 $count waiting",
+                                text = "🔥 $waitingCount waiting",
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -247,70 +281,183 @@ fun GameCard(
             }
 
             Column(Modifier.padding(16.dp)) {
+                // Header: Location & Scorebug Status (Inning / Clock / Scheduled Badge)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = game.location,
-                            fontSize = 12.sp,
-                            color = Color.Gray,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    val isLive = game.boxScore.status.equals("Live", ignoreCase = true)
-                    Surface(
-                        color = if (isLive) Color(0xFFE53935) else Color(0xFFECEFF1),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = game.boxScore.status.uppercase(),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = if (isLive) Color.White else Color(0xFF455A64),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Text(
+                        text = game.location,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+
+                    Spacer(Modifier.width(8.dp))
+
+                    if (isLiveGame) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            LivePulsingBadge()
+                            // Inning and outs display temporarily commented out until live bullpen data is available
+                            /*
+                            game.boxScore.inningDisplay?.let { inningText ->
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = inningText,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            */
+                        }
+                    } else {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = game.boxScore.status.uppercase(),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
                 
                 Spacer(Modifier.height(14.dp))
                 
-                TeamRow(team = game.awayTeam, score = game.boxScore.awayScore)
-                Spacer(Modifier.height(8.dp))
-                TeamRow(team = game.homeTeam, score = game.boxScore.homeScore)
+                // Away Team Row
+                TeamRow(
+                    team = game.awayTeam,
+                    score = game.boxScore.awayScore,
+                    runs = game.boxScore.awayRuns,
+                    hits = game.boxScore.awayHits,
+                    isLive = isLiveGame
+                )
+                Spacer(Modifier.height(10.dp))
+                // Home Team Row
+                TeamRow(
+                    team = game.homeTeam,
+                    score = game.boxScore.homeScore,
+                    runs = game.boxScore.homeRuns,
+                    hits = game.boxScore.homeHits,
+                    isLive = isLiveGame
+                )
 
-                // Start Time in Local Device Time
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(14.dp))
+
+                // Dual Time Display & Banana Ball 2-Hour Clock
+                val streamStartTime = game.streamingMetadata?.actualStartTime
+                val gameStartTime = game.startTime
+                val hasDistinctStreamTime = streamStartTime != null && 
+                    (streamStartTime.hour != gameStartTime.hour || streamStartTime.minute != gameStartTime.minute)
+                val timeRemaining = rememberBananaBallCountdown(gameStartTime, isLiveGame)
+
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFF1F5F9)
+                    color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("🕒", fontSize = 13.sp)
-                            Spacer(Modifier.width(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("⚾", fontSize = 12.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "Game Start (First Pitch):",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                             Text(
-                                text = "Start Time (Local):",
+                                text = formatLocalGameTime(gameStartTime),
                                 fontSize = 12.sp,
-                                color = Color(0xFF475569),
-                                fontWeight = FontWeight.Medium
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                        Text(
-                            text = formatLocalGameTime(game.streamingMetadata?.actualStartTime ?: game.startTime),
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.secondary,
-                            fontWeight = FontWeight.Bold
-                        )
+
+                        if (timeRemaining != null) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("⏱", fontSize = 12.sp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "2-Hour Game Clock:",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                Text(
+                                    text = "$timeRemaining remaining",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFFFD700),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        if (hasDistinctStreamTime && streamStartTime != null) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("📡", fontSize = 12.sp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "Stream Broadcast:",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                Text(
+                                    text = if (isLiveGame) "🔴 LIVE NOW" else formatLocalGameTime(streamStartTime),
+                                    fontSize = 12.sp,
+                                    color = if (isLiveGame) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
                 
@@ -320,18 +467,57 @@ fun GameCard(
                         onClick = { onWatchLive(game.youtubeUrl) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (game.boxScore.status.equals("Live", ignoreCase = true)) Color(0xFFCC0000) else MaterialTheme.colorScheme.secondary
+                            containerColor = if (isLiveGame) Color(0xFFCC0000) else MaterialTheme.colorScheme.secondary
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Text(
-                            text = if (game.boxScore.status.equals("Live", ignoreCase = true)) "▶ WATCH LIVE" else "▶ OPEN STREAM",
+                            text = if (isLiveGame) "▶ WATCH LIVE ON YOUTUBE" else "▶ OPEN YOUTUBE STREAM",
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun LivePulsingBadge() {
+    val infiniteTransition = rememberInfiniteTransition()
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = EaseInOutCubic),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    Surface(
+        color = Color(0xFFDC2626),
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .alpha(alpha)
+                    .clip(CircleShape)
+                    .background(Color.White)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "LIVE",
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 0.5.sp
+            )
         }
     }
 }
@@ -346,18 +532,56 @@ private fun formatLocalGameTime(dateTime: LocalDateTime): String {
     return "$hour12:$minuteStr $amPm"
 }
 
+@OptIn(ExperimentalTime::class)
 @Composable
-fun TeamRow(team: com.example.bananasball.domain.model.Team, score: Int) {
+fun rememberBananaBallCountdown(gameStartTime: LocalDateTime, isLive: Boolean): String? {
+    if (!isLive) return null
+    val countdown by produceState<String?>(initialValue = null, key1 = gameStartTime, key2 = isLive) {
+        while (true) {
+            val now = Clock.System.now()
+            // First pitch is officially ~:02 past scheduled time (ceremonies/anthem)
+            val gameStartInstant = gameStartTime.toInstant(TimeZone.currentSystemDefault())
+            val firstPitchInstant = gameStartInstant.plus(kotlin.time.Duration.parse("2m"))
+            val elapsedSeconds = (now - firstPitchInstant).inWholeSeconds
+
+            value = if (elapsedSeconds in 0..7200) {
+                val remainingSeconds = 7200 - elapsedSeconds
+                val hours = remainingSeconds / 3600
+                val minutes = (remainingSeconds % 3600) / 60
+                val seconds = remainingSeconds % 60
+                "${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
+            } else if (elapsedSeconds < 0 && elapsedSeconds > -900) {
+                "2:00:00"
+            } else {
+                null
+            }
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    return countdown
+}
+
+@Composable
+fun TeamRow(
+    team: com.example.bananasball.domain.model.Team,
+    score: Int,
+    runs: Int? = null,
+    hits: Int? = null,
+    isLive: Boolean = false
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
             Surface(
                 modifier = Modifier.size(38.dp),
                 shape = CircleShape,
-                color = Color(0xFFF0F4F8)
+                color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 if (team.logoUrl != null) {
                     AsyncImage(
@@ -367,16 +591,56 @@ fun TeamRow(team: com.example.bananasball.domain.model.Team, score: Int) {
                     )
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(team.shortName.take(1), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                        Text(
+                            text = team.shortName.take(1),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
             }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(team.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(team.shortName, color = Color.Gray, fontSize = 11.sp)
+                Text(
+                    text = team.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = team.shortName,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (runs != null || hits != null) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "•  ${runs ?: 0} R, ${hits ?: 0} H",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                        )
+                    }
+                }
             }
         }
-        Text(score.toString(), fontWeight = FontWeight.Black, fontSize = 20.sp)
+        
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = score.toString(),
+                fontWeight = FontWeight.Black,
+                fontSize = 22.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (isLive) {
+                Text(
+                    text = "PTS",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
