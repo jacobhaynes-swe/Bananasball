@@ -58,4 +58,6 @@
 - release: prepare v1.0.0 public beta release with automated asset distribution
 - feat(icon): generate and configure custom yellow baseball adaptive launcher icon across all mipmap density buckets
 - release: publish v1.0.1 public release with custom app launcher branding
+- docs(screenshots): update schedule live view showcase with Friday 21 Tailgaters vs Clowns live broadcast
+
 
