@@ -77,9 +77,15 @@ fun ScrapedGame.toEntity(): GameEntity {
     val isoDate = parsedDate.toString()
     
     val parsedGameStartTime = parseGameDateTime(date, time, null)
-    val parsedStreamStartTime = actualStartTime?.toLongOrNull()?.let { seconds ->
-        runCatching {
-            Instant.fromEpochSeconds(seconds)
+    val parsedStreamStartTime = actualStartTime?.let { raw ->
+        raw.toLongOrNull()?.let { seconds ->
+            runCatching {
+                Instant.fromEpochSeconds(seconds)
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .toString()
+            }.getOrNull()
+        } ?: runCatching {
+            Instant.parse(raw)
                 .toLocalDateTime(TimeZone.currentSystemDefault())
                 .toString()
         }.getOrNull()

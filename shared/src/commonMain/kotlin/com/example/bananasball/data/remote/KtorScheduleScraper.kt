@@ -284,9 +284,18 @@ class KtorScheduleScraper(
 
     @OptIn(ExperimentalTime::class)
     private fun matchesGameDate(metadata: EnrichedStreamMetadata, gameDate: LocalDate, today: LocalDate): Boolean {
-        metadata.scheduledStartTime?.toLongOrNull()?.let { seconds ->
-            val streamDate = Instant.fromEpochSeconds(seconds).toLocalDateTime(TimeZone.currentSystemDefault()).date
-            return streamDate == gameDate
+        metadata.scheduledStartTime?.let { raw ->
+            val streamDate = raw.toLongOrNull()?.let { seconds ->
+                runCatching {
+                    Instant.fromEpochSeconds(seconds).toLocalDateTime(TimeZone.currentSystemDefault()).date
+                }.getOrNull()
+            } ?: runCatching {
+                Instant.parse(raw).toLocalDateTime(TimeZone.currentSystemDefault()).date
+            }.getOrNull()
+
+            if (streamDate != null) {
+                return streamDate == gameDate
+            }
         }
         if (metadata.isLiveBroadcast) {
             return gameDate == today
@@ -322,30 +331,33 @@ class KtorScheduleScraper(
             val titleRegex = Regex("<title>(.*?)(?: - YouTube)?</title>")
             val title = titleRegex.find(watchHtml)?.groupValues?.get(1)?.replace("&amp;", "&")
 
-            val isLive = watchHtml.contains("\"isLive\":true") || 
-                         watchHtml.contains("watching now") || 
-                         watchHtml.contains("BADGE_STYLE_TYPE_LIVE_NOW") ||
-                         watchHtml.contains("\"style\":\"LIVE\"")
+            val isUpcoming = watchHtml.contains("\"isUpcoming\":true") || watchHtml.contains("\"isLiveNow\":false")
+            val isLive = (watchHtml.contains("\"isLiveNow\":true") || watchHtml.contains("watching now") || watchHtml.contains("BADGE_STYLE_TYPE_LIVE_NOW")) && !isUpcoming
 
-            // Real-time live viewers count
-            val origViewCountRegex = Regex("\"originalViewCount\"\\s*:\\s*\"(\\d+)\"")
-            val runsViewCountRegex = Regex("\"viewCount\"\\s*:\\s*\\{\\s*\"videoViewCountRenderer\"\\s*:\\s*\\{.*?\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([0-9,]+)\"")
-            val watchingRegex = Regex("\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"\\s*watching")
-            val fallbackWatchingRegex = Regex("([0-9,]+)\\s+watching")
-
-            val viewerCount = origViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.toIntOrNull()
-                ?: runsViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-                ?: watchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-                ?: fallbackWatchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-
-            // Pre-game waiting count
+            // Pre-game waiting count (for upcoming scheduled streams)
             val waitingRegex = Regex("([0-9,]+)\\s+waiting")
             val waitingText = waitingRegex.find(watchHtml)?.groupValues?.get(1)
             val waitingCount = waitingText?.replace(",", "")?.toIntOrNull()
 
-            // Scheduled time (Unix timestamp)
-            val scheduledRegex = Regex("\"scheduledStartTime\"\\s*:\\s*\"(\\d+)\"")
-            val scheduledStartTime = scheduledRegex.find(watchHtml)?.groupValues?.get(1)
+            // Real-time live viewers count (only for active live broadcasts)
+            val origViewCountRegex = Regex("\"originalViewCount\"\\s*:\\s*\"(\\d+)\"")
+            val runsViewCountRegex = Regex("\"viewCount\"\\s*:\\s*\\{\\s*\"videoViewCountRenderer\"\\s*:\\s*\\{.*?\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([0-9,]+)\"")
+            val watchingRegex = Regex("\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"\\s*watching")
+            val fallbackWatchingRegex = Regex("([0-9,]+)\\s+watching now")
+
+            val viewerCount = if (isLive) {
+                origViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.toIntOrNull()
+                    ?: runsViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                    ?: watchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                    ?: fallbackWatchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+            } else null
+
+            // Scheduled start time (ISO string or Unix timestamp)
+            val startTimestampRegex = Regex("\"startTimestamp\"\\s*:\\s*\"([^\"]+)\"")
+            val scheduledStartTimeRegex = Regex("\"scheduledStartTime\"\\s*:\\s*\"(\\d+)\"")
+            val scheduledStartTime = startTimestampRegex.find(watchHtml)?.groupValues?.get(1)
+                ?: scheduledStartTimeRegex.find(watchHtml)?.groupValues?.get(1)
+                ?: scheduledStartTimeRegex.find(channelHtml)?.groupValues?.get(1)
 
             EnrichedStreamMetadata(
                 videoId = videoId,
