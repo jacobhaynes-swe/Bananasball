@@ -47,3 +47,13 @@
 - feat(ui): implement MainAppScaffold bottom navigation shell linking Schedule, Stats, and Teams
 - feat(foss): enforce strict FOSS/F-Droid compliance by loading all logos and images dynamically via Coil with zero APK-bundled brand assets
 - test: deploy and verify full multi-view navigation on Pixel 7 emulator across all screens
+
+## 🗓️ 2026-08-21 (Release Automation, Council Directives & UI Edge-to-Edge)
+
+- feat(ui): remove legacy Android platform ActionBar via `Theme.Bananasball` for seamless edge-to-edge Material 3 styling
+- docs(council): establish Council of Android autonomous specialist directives and work-hours commit blockout rules in `AGENTS.md` and `.agents/`
+- docs(api): map out comprehensive Directus and stats API surface in `docs/BANANABALL_INTELLIGENCE.md` covering box scores, lineups, player ledgers, and social feeds
+- feat(ci): add automated GitHub Actions APK release pipeline (`.github/workflows/release.yml`) for tag-driven builds
+- docs(readme): embed 3-view framed screenshot showcase gallery and prominent Download APK badge with sideload guide
+- release: prepare v1.0.0 public beta release with automated asset distribution
+

@@ -1,0 +1,45 @@
+name: Build & Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew :androidApp:assembleDebug
+
+      - name: Prepare Release Asset
+        run: |
+          mkdir -p release-assets
+          VERSION_TAG="${{ github.ref_name }}"
+          if [ -z "$VERSION_TAG" ] || [ "$VERSION_TAG" = "master" ]; then
+            VERSION_TAG="latest"
+          fi
+          cp androidApp/build/outputs/apk/debug/androidApp-debug.apk release-assets/Bananasball-${VERSION_TAG}.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*.apk
+          generate_release_notes: true
