@@ -9,11 +9,11 @@ A professional-ish fan app for the **Banana Ball** league, allowing fans to quic
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/schedule_live_view.png" width="280" alt="Live Schedule, Hype & 2-Hour Clock">
+  <img src="docs/screenshots/schedule_live_view.png" width="225" alt="Live Schedule, Hype & 2-Hour Clock">
   &nbsp;&nbsp;
-  <img src="docs/screenshots/stats_standings_view.png" width="280" alt="League Standings & Leaders">
+  <img src="docs/screenshots/stats_standings_view.png" width="225" alt="League Standings & Leaders">
   &nbsp;&nbsp;
-  <img src="docs/screenshots/teams_view.png" width="280" alt="Banana Ball Teams & Media Hub">
+  <img src="docs/screenshots/teams_view.png" width="225" alt="Banana Ball Teams & Media Hub">
 </p>
 
 ---

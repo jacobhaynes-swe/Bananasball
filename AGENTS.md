@@ -61,7 +61,8 @@ These rules govern the autonomous roles, execution standards, and commit gating 
 - **Responsibilities & Constraints**:
   - **Work Hours Commit Blockout (STRICT)**: **NO commits or pushes between 10:00 AM – 4:00 PM CT (Central Time)** on workdays. Development and testing are fine, but git commits and pushes must wait until outside this window.
   - **Explicit User Trigger**: NEVER git add, commit, or push without explicit user command.
-  - Format atomic Conventional Commits (`feat(ui): ...`, `fix(data): ...`, `docs: ...`).
+  - **Commit Message Style**: Keep messages simple, natural, and direct — just describe what changed in plain English (e.g. `update readme screenshots and set image width to 225`). No bureaucratic prefixes (`feat(...)`, `docs(...)`, etc.) required.
+  - **Tone & Formatting**: Keep responses, commit messages, markdown docs, and app UI clean, natural, and professional. Avoid emoji spam and AI tropes; plain text is standard, with only occasional banana or baseball accents when appropriate.
   - Update `FELLOWSHIP_LOG.md` and walkthrough documentation with every major milestone.
   - Push cleanly to `origin/master` upon explicit trigger outside the blockout window.
 
