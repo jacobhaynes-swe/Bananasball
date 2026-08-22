@@ -75,6 +75,8 @@ fun ScrapedGame.toEntity(): GameEntity {
 
     val parsedDate = parseDate(date)
     val isoDate = parsedDate.toString()
+    val (teamA, teamB) = listOf(homeCode, awayCode).sorted()
+    val canonicalId = "${isoDate}_${teamA}_${teamB}"
     
     val parsedGameStartTime = parseGameDateTime(date, time, null)
     val parsedStreamStartTime = actualStartTime?.let { raw ->
@@ -92,7 +94,7 @@ fun ScrapedGame.toEntity(): GameEntity {
     }
 
     return GameEntity(
-        id = "${isoDate}_${homeCode}_${awayCode}",
+        id = canonicalId,
         homeTeamId = homeCode,
         homeTeamName = homeTeam?.name ?: "Team $homeCode",
         homeTeamShort = homeTeam?.shortName ?: homeCode,

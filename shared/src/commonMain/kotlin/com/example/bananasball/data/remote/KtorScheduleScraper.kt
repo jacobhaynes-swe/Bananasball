@@ -32,31 +32,16 @@ class KtorScheduleScraper(
         // 1. Fetch from official Stats Games API (gives live in-progress, today's games, and completed games)
         val apiGames = fetchGamesFromApi()
         for (game in apiGames) {
-            val parsedDate = parseDate(game.date)
-            val home = game.teamCodes.getOrNull(0) ?: ""
-            val away = game.teamCodes.getOrNull(1) ?: ""
-            val key = "${parsedDate}_${home}_${away}"
+            val key = canonicalGameKey(game.date, game.teamCodes)
             gamesMap[key] = game
         }
 
         // 2. Fetch from Website Schedule HTML (gives future upcoming tour schedule with venues and watch channels)
         val htmlGames = fetchGamesFromHtml()
         for (game in htmlGames) {
-            val parsedDate = parseDate(game.date)
-            val home = game.teamCodes.getOrNull(0) ?: ""
-            val away = game.teamCodes.getOrNull(1) ?: ""
-            val key = "${parsedDate}_${home}_${away}"
-            val altKey = "${parsedDate}_${away}_${home}"
-
-            if (gamesMap.containsKey(key)) {
-                val existing = gamesMap[key]!!
-                gamesMap[key] = existing.copy(
-                    location = if (existing.location.isNotBlank()) existing.location else game.location,
-                    time = if (existing.time.isNotBlank()) existing.time else game.time,
-                    youtubeUrl = existing.youtubeUrl ?: game.youtubeUrl
-                )
-            } else if (gamesMap.containsKey(altKey)) {
-                val existing = gamesMap.remove(altKey)!!
+            val key = canonicalGameKey(game.date, game.teamCodes)
+            val existing = gamesMap[key]
+            if (existing != null) {
                 gamesMap[key] = existing.copy(
                     location = if (existing.location.isNotBlank()) existing.location else game.location,
                     time = if (existing.time.isNotBlank()) existing.time else game.time,
@@ -74,8 +59,8 @@ class KtorScheduleScraper(
             val isTodayOrLive = parsedLocalDate == today || game.status?.contains("Live", ignoreCase = true) == true
 
             if (isTodayOrLive || isWithinNextDays(game.date, 1)) {
-                val candidate = discoverEnrichedMetadata(game.youtubeUrl ?: "")
-                println("Scraper: candidate for ${game.youtubeUrl} -> viewerCount=${candidate?.viewerCount}, isLive=${candidate?.isLiveBroadcast}")
+                val candidate = discoverEnrichedMetadata(game.youtubeUrl ?: "", game.teamCodes, parsedLocalDate, today)
+                println("Scraper: candidate for ${game.youtubeUrl} -> viewerCount=${candidate?.viewerCount}, isLive=${candidate?.isLiveBroadcast}, title=${candidate?.title}")
                 if (candidate != null && matchesGameDate(candidate, parsedLocalDate, today)) {
                     enrichedGames.add(
                         game.copy(
@@ -303,76 +288,143 @@ class KtorScheduleScraper(
         return gameDate == today
     }
 
-    private suspend fun discoverEnrichedMetadata(targetUrl: String): EnrichedStreamMetadata? {
-        if (targetUrl.isBlank()) return null
+    private suspend fun discoverEnrichedMetadata(
+        targetUrl: String,
+        teamCodes: List<String> = emptyList(),
+        targetDate: LocalDate? = null,
+        today: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+    ): EnrichedStreamMetadata? {
+        if (targetUrl.isBlank() && teamCodes.isEmpty()) return null
         return try {
             val directVideoId = if (targetUrl.contains("watch?v=") || targetUrl.contains("/live/")) {
                 Regex("(?:watch\\?v=|/live/)([a-zA-Z0-9_-]+)").find(targetUrl)?.groupValues?.get(1)
             } else null
 
-            val channelHtml = if (directVideoId != null) "" else {
-                httpClient.get(targetUrl) {
-                    headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                }.bodyAsText()
+            val videoIds = mutableListOf<String>()
+            if (directVideoId != null) {
+                videoIds.add(directVideoId)
             }
-            val videoId = directVideoId ?: run {
-                val videoIdRegex = Regex("(?:/watch\\?v=|/live/|\"videoId\"\\s*:\\s*\"|\"contentId\"\\s*:\\s*\")([a-zA-Z0-9_-]+)")
-                videoIdRegex.find(channelHtml)?.groupValues?.get(1) ?: return null
+
+            // Determine channel URL to scan for scheduled/live video IDs
+            val channelUrl = when {
+                targetUrl.contains("youtube.com/@") || targetUrl.contains("youtube.com/c/") || targetUrl.contains("youtube.com/channel/") -> targetUrl
+                teamCodes.isNotEmpty() -> com.example.bananasball.data.repository.StaticTeamProvider.getChannelUrl(teamCodes.first())
+                else -> ""
             }
-            
-            val directUrl = "https://www.youtube.com/watch?v=$videoId"
-            val thumbUrl = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
 
-            // Now fetch the watch page to get exact real-time live viewers and stream title
-            val watchHtml = httpClient.get(directUrl) {
-                headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            }.bodyAsText()
+            if (channelUrl.isNotBlank()) {
+                try {
+                    val channelHtml = httpClient.get(channelUrl) {
+                        headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    }.bodyAsText()
 
-            val titleRegex = Regex("<title>(.*?)(?: - YouTube)?</title>")
-            val title = titleRegex.find(watchHtml)?.groupValues?.get(1)?.replace("&amp;", "&")
+                    val videoIdRegex = Regex("(?:/watch\\?v=|/live/|\"videoId\"\\s*:\\s*\")([a-zA-Z0-9_-]+)")
+                    videoIdRegex.findAll(channelHtml).forEach { match ->
+                        val vid = match.groupValues[1]
+                        if (vid !in videoIds && vid !in listOf("live_stream", "hqdefault", "default")) {
+                            videoIds.add(vid)
+                        }
+                    }
+                } catch (e: Exception) {
+                    println("Scraper: Channel scan failed for $channelUrl: ${e.message}")
+                }
+            }
 
-            val isUpcoming = watchHtml.contains("\"isUpcoming\":true") || watchHtml.contains("\"isLiveNow\":false")
-            val isLive = (watchHtml.contains("\"isLiveNow\":true") || watchHtml.contains("watching now") || watchHtml.contains("BADGE_STYLE_TYPE_LIVE_NOW")) && !isUpcoming
+            if (videoIds.isEmpty()) return null
 
-            // Pre-game waiting count (for upcoming scheduled streams)
-            val waitingRegex = Regex("([0-9,]+)\\s+waiting")
-            val waitingText = waitingRegex.find(watchHtml)?.groupValues?.get(1)
-            val waitingCount = waitingText?.replace(",", "")?.toIntOrNull()
+            // Inspect candidate streams (up to 8 candidates)
+            val candidates = mutableListOf<EnrichedStreamMetadata>()
+            for (videoId in videoIds.take(8)) {
+                val directUrl = "https://www.youtube.com/watch?v=$videoId"
+                val thumbUrl = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
 
-            // Real-time live viewers count (only for active live broadcasts)
-            val origViewCountRegex = Regex("\"originalViewCount\"\\s*:\\s*\"(\\d+)\"")
-            val runsViewCountRegex = Regex("\"viewCount\"\\s*:\\s*\\{\\s*\"videoViewCountRenderer\"\\s*:\\s*\\{.*?\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([0-9,]+)\"")
-            val watchingRegex = Regex("\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"\\s*watching")
-            val fallbackWatchingRegex = Regex("([0-9,]+)\\s+watching now")
+                val watchHtml = try {
+                    httpClient.get(directUrl) {
+                        headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    }.bodyAsText()
+                } catch (e: Exception) {
+                    continue
+                }
 
-            val viewerCount = if (isLive) {
-                origViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.toIntOrNull()
-                    ?: runsViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-                    ?: watchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-                    ?: fallbackWatchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-            } else null
+                val titleRegex = Regex("<title>(.*?)(?: - YouTube)?</title>")
+                val title = titleRegex.find(watchHtml)?.groupValues?.get(1)?.replace("&amp;", "&")
 
-            // Scheduled start time (ISO string or Unix timestamp)
-            val startTimestampRegex = Regex("\"startTimestamp\"\\s*:\\s*\"([^\"]+)\"")
-            val scheduledStartTimeRegex = Regex("\"scheduledStartTime\"\\s*:\\s*\"(\\d+)\"")
-            val scheduledStartTime = startTimestampRegex.find(watchHtml)?.groupValues?.get(1)
-                ?: scheduledStartTimeRegex.find(watchHtml)?.groupValues?.get(1)
-                ?: scheduledStartTimeRegex.find(channelHtml)?.groupValues?.get(1)
+                // Pre-game waiting count (for upcoming scheduled streams)
+                val runsWaitingRegex = Regex("\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"[^\"]*waiting", RegexOption.IGNORE_CASE)
+                val textWaitingRegex = Regex("\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"\\s*waiting", RegexOption.IGNORE_CASE)
+                val literalWaitingRegex = Regex("([0-9,]+)\\s+waiting", RegexOption.IGNORE_CASE)
 
-            EnrichedStreamMetadata(
-                videoId = videoId,
-                directUrl = directUrl,
-                thumbnailUrl = thumbUrl,
-                waitingCount = waitingCount,
-                viewerCount = viewerCount,
-                isLiveBroadcast = isLive,
-                scheduledStartTime = scheduledStartTime,
-                title = title
+                val waitingCount = runsWaitingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                    ?: textWaitingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                    ?: literalWaitingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+
+                val isUpcoming = Regex("\"isUpcoming\"\\s*:\\s*true").containsMatchIn(watchHtml) || 
+                    Regex("\"isLiveNow\"\\s*:\\s*false").containsMatchIn(watchHtml) || 
+                    (waitingCount != null && waitingCount > 0)
+                val isLive = (Regex("\"isLiveNow\"\\s*:\\s*true").containsMatchIn(watchHtml) || watchHtml.contains("watching now") || watchHtml.contains("BADGE_STYLE_TYPE_LIVE_NOW")) && !isUpcoming
+
+                // Real-time live viewers count (only for active live broadcasts)
+                val origViewCountRegex = Regex("\"originalViewCount\"\\s*:\\s*\"(\\d+)\"")
+                val runsViewCountRegex = Regex("\"viewCount\"\\s*:\\s*\\{\\s*\"videoViewCountRenderer\"\\s*:\\s*\\{.*?\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([0-9,]+)\"")
+                val watchingRegex = Regex("\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"\\s*watching")
+                val fallbackWatchingRegex = Regex("([0-9,]+)\\s+watching now")
+
+                val viewerCount = if (isLive) {
+                    origViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.toIntOrNull()
+                        ?: runsViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                        ?: watchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                        ?: fallbackWatchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                } else null
+
+                // Scheduled start time (ISO string or Unix timestamp)
+                val startTimestampRegex = Regex("\"startTimestamp\"\\s*:\\s*\"([^\"]+)\"")
+                val scheduledStartTimeRegex = Regex("\"scheduledStartTime\"\\s*:\\s*\"(\\d+)\"")
+                val scheduledStartTime = startTimestampRegex.find(watchHtml)?.groupValues?.get(1)
+                    ?: scheduledStartTimeRegex.find(watchHtml)?.groupValues?.get(1)
+
+                candidates.add(
+                    EnrichedStreamMetadata(
+                        videoId = videoId,
+                        directUrl = directUrl,
+                        thumbnailUrl = thumbUrl,
+                        waitingCount = waitingCount,
+                        viewerCount = viewerCount,
+                        isLiveBroadcast = isLive,
+                        scheduledStartTime = scheduledStartTime,
+                        title = title
+                    )
+                )
+            }
+
+            if (candidates.isEmpty()) return null
+
+            // Prioritize English streams over Spanish:
+            // 1. Date matches AND is English (not Spanish)
+            // 2. Date matches AND is Spanish
+            // 3. Live broadcast AND is English
+            // 4. Live broadcast AND is Spanish
+            // 5. English streams
+            // 6. Any stream
+            val sorted = candidates.sortedWith(
+                compareBy<EnrichedStreamMetadata> { candidate ->
+                    val matchesDate = if (targetDate != null) matchesGameDate(candidate, targetDate, today) else candidate.isLiveBroadcast
+                    if (matchesDate) 0 else 1
+                }.thenBy { candidate ->
+                    if (isSpanishStream(candidate.title)) 1 else 0
+                }
             )
+
+            sorted.firstOrNull()
         } catch (e: Exception) {
             println("Scraper: Deep discovery error for $targetUrl: ${e.message}")
             null
         }
+    }
+
+    private fun isSpanishStream(title: String?): Boolean {
+        if (title == null) return false
+        val t = title.lowercase()
+        return t.contains("español") || t.contains("espanol") || t.contains("spanish") || t.contains("transmisión")
     }
 
     @OptIn(ExperimentalTime::class)
@@ -409,5 +461,13 @@ class KtorScheduleScraper(
             ?: teamCodes.firstOrNull() ?: "SB"
 
         return com.example.bananasball.data.repository.StaticTeamProvider.getChannelUrl(matchedCode)
+    }
+
+    private fun canonicalGameKey(date: String, teamCodes: List<String>): String {
+        val parsedDate = parseDate(date)
+        val home = teamCodes.getOrNull(0) ?: ""
+        val away = teamCodes.getOrNull(1) ?: ""
+        val (teamA, teamB) = listOf(home, away).sorted()
+        return "${parsedDate}_${teamA}_${teamB}"
     }
 }
