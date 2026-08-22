@@ -32,5 +32,6 @@ data class GameEntity(
     val currentInning: Int? = null,
     val inningHalf: String? = null,
     val outs: Int? = null,
-    val inningDisplay: String? = null
+    val inningDisplay: String? = null,
+    val statsGameId: String? = null
 )

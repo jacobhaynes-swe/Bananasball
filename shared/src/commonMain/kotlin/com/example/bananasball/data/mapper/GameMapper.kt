@@ -61,7 +61,8 @@ fun GameEntity.toDomain(): Game {
             isLiveBroadcast = isLiveBroadcast,
             actualStartTime = actualStartTime?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() },
             streamTitle = streamTitle
-        )
+        ),
+        statsGameId = statsGameId
     )
 }
 
@@ -121,7 +122,8 @@ fun ScrapedGame.toEntity(): GameEntity {
         currentInning = currentInning,
         inningHalf = inningHalf,
         outs = outs,
-        inningDisplay = inningDisplay
+        inningDisplay = inningDisplay,
+        statsGameId = statsGameId
     )
 }
 

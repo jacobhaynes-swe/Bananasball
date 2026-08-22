@@ -11,6 +11,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.time.ExperimentalTime
 import kotlinx.datetime.*
+import com.example.bananasball.domain.model.*
 import kotlinx.serialization.json.*
 
 /**
@@ -89,6 +90,7 @@ class KtorScheduleScraper(
             val root = json.parseToJsonElement(response).jsonArray
             for (elem in root) {
                 val obj = elem.jsonObject
+                val gameId = obj["id"]?.jsonPrimitive?.contentOrNull
                 val date = obj["date"]?.jsonPrimitive?.contentOrNull ?: continue
                 val rawTime = obj["time"]?.jsonPrimitive?.contentOrNull ?: "19:00:00"
                 val venueTz = obj["venue_timezone"]?.jsonPrimitive?.contentOrNull ?: ""
@@ -149,7 +151,8 @@ class KtorScheduleScraper(
                         currentInning = inning,
                         inningHalf = half,
                         outs = outs,
-                        inningDisplay = display
+                        inningDisplay = display,
+                        statsGameId = gameId
                     )
                 )
             }
@@ -173,32 +176,171 @@ class KtorScheduleScraper(
         val awayFrac = ((awayIp - awayFull) * 10f).roundToInt()
 
         // 1. Home team pitcher is actively pitching in Top half (Home pitches first).
-        // 4.2 IP means 4 full innings + 2 outs in 5th inning = Top of 5th, 2 Outs.
         if (homeFrac in 1..2) {
             val inning = homeFull + 1
-            val outs = homeFrac
-            val suffix = if (outs == 1) "Out" else "Outs"
-            return InningState(inning, "TOP", outs, "▲ ${toOrdinal(inning)} • $outs $suffix")
+            return InningState(inning, "TOP", homeFrac, "▲ $inning")
         }
 
         // 2. Away team pitcher is actively pitching in Bottom half.
-        // 4.2 IP means 4 full innings + 2 outs in 5th inning = Bottom of 5th, 2 Outs.
         if (awayFrac in 1..2) {
             val inning = maxOf(homeFull, awayFull + 1)
-            val outs = awayFrac
-            val suffix = if (outs == 1) "Out" else "Outs"
-            return InningState(inning, "BOT", outs, "▼ ${toOrdinal(inning)} • $outs $suffix")
+            return InningState(inning, "BOT", awayFrac, "▼ $inning")
         }
 
-        // 3. Both are whole numbers (e.g. 5.0 vs 2.0 or 5.0 vs 5.0)
+        // 3. Both whole numbers
         return if (homeFull > awayFull) {
             val inning = homeFull
-            InningState(inning, "BOT", 0, "▼ ${toOrdinal(inning)} • 0 Outs")
+            InningState(inning, "BOT", 0, "▼ $inning")
         } else if (homeFull == awayFull && homeFull > 0) {
             val nextInning = homeFull + 1
-            InningState(nextInning, "TOP", 0, "▲ ${toOrdinal(nextInning)} • 0 Outs")
+            InningState(nextInning, "TOP", 0, "▲ $nextInning")
         } else {
-            InningState(1, "TOP", 0, "▲ 1ST • 0 Outs")
+            InningState(1, "TOP", 0, "▲ 1")
+        }
+    }
+
+    override suspend fun fetchGameBoxScore(gameId: String): Result<GameDetail> {
+        return runCatching {
+            val url = "https://banana-stats-pages-seven.vercel.app/api/directus-items/box-score?gameId=$gameId"
+            val response = httpClient.get(url).bodyAsText()
+            val root = json.parseToJsonElement(response).jsonObject
+
+            val status = root["status"]?.jsonPrimitive?.contentOrNull ?: "scheduled"
+            val numInnings = root["numberOfInnings"]?.jsonPrimitive?.intOrNull ?: 9
+            val eqAwarded = root["equalizerPointAwarded"]?.jsonPrimitive?.booleanOrNull ?: false
+            val eqInning = root["equalizerPointInning"]?.jsonPrimitive?.intOrNull
+            val notes = root["notes"]?.jsonPrimitive?.contentOrNull
+
+            val venueObj = root["venue"]?.jsonObject
+            val venue = if (venueObj != null) {
+                VenueDetail(
+                    name = venueObj["name"]?.jsonPrimitive?.contentOrNull ?: "Ballpark",
+                    city = venueObj["city"]?.jsonPrimitive?.contentOrNull,
+                    state = venueObj["state"]?.jsonPrimitive?.contentOrNull,
+                    timezone = venueObj["timezone"]?.jsonPrimitive?.contentOrNull
+                )
+            } else null
+
+            val teamsArr = root["teams"]?.jsonArray ?: emptyList()
+            var homeDetail: TeamGameDetail? = null
+            var awayDetail: TeamGameDetail? = null
+
+            for (tElem in teamsArr) {
+                val tObj = tElem.jsonObject
+                val tId = tObj["teamId"]?.jsonPrimitive?.contentOrNull ?: ""
+                val tName = tObj["teamName"]?.jsonPrimitive?.contentOrNull ?: ""
+                val tAbbr = tObj["teamAbbreviation"]?.jsonPrimitive?.contentOrNull ?: ""
+                val tLogo = tObj["teamLogo"]?.jsonPrimitive?.contentOrNull
+                val isHome = tObj["isHomeTeam"]?.jsonPrimitive?.booleanOrNull ?: false
+
+                val prh = tObj["prh"]?.jsonObject
+                val ptsReg = prh?.get("points_regular")?.jsonPrimitive?.intOrNull ?: 0
+                val ptsSd = prh?.get("points_sd")?.jsonPrimitive?.intOrNull ?: 0
+                val ptsTotal = prh?.get("points_total")?.jsonPrimitive?.intOrNull ?: (ptsReg + ptsSd)
+                val runsTotal = prh?.get("runs")?.jsonPrimitive?.intOrNull ?: 0
+                val hitsTotal = prh?.get("hits")?.jsonPrimitive?.intOrNull ?: 0
+
+                val lineScore = tObj["lineScore"]?.jsonObject
+                val inningsArr = lineScore?.get("innings")?.jsonArray ?: emptyList()
+                val innings = inningsArr.mapNotNull { iElem ->
+                    val iObj = iElem.jsonObject
+                    val inn = iObj["inning"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+                    val r = iObj["runs"]?.jsonPrimitive?.intOrNull ?: 0
+                    val h = iObj["hits"]?.jsonPrimitive?.intOrNull ?: 0
+                    val pts = iObj["points_awarded"]?.jsonPrimitive?.intOrNull ?: 0
+                    InningScore(inn, r, h, pts)
+                }
+
+                val showdownArr = lineScore?.get("showdown")?.jsonArray ?: emptyList()
+                val showdowns = showdownArr.mapNotNull { sElem ->
+                    val sObj = sElem.jsonObject
+                    val rnd = sObj["round"]?.jsonPrimitive?.intOrNull ?: 1
+                    val res = sObj["result"]?.jsonPrimitive?.contentOrNull
+                    val outcome = sObj["outcome_type"]?.jsonPrimitive?.contentOrNull
+                    val r = sObj["runs_scored"]?.jsonPrimitive?.intOrNull ?: 0
+                    val h = sObj["hits_recorded"]?.jsonPrimitive?.intOrNull ?: 0
+                    val wo = sObj["is_walkoff"]?.jsonPrimitive?.booleanOrNull ?: false
+                    ShowdownRoundSummary(rnd, res, outcome, r, h, wo)
+                }
+
+                val battersArr = tObj["batters"]?.jsonArray ?: emptyList()
+                val batters = battersArr.mapNotNull { bElem ->
+                    val bObj = bElem.jsonObject
+                    val pid = bObj["playerId"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                    val bName = bObj["name"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val num = bObj["jersey_number"]?.jsonPrimitive?.intOrNull
+                    val ord = bObj["order"]?.jsonPrimitive?.intOrNull ?: 999
+                    val posList = bObj["positions"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
+                    val rolesList = bObj["hitting_roles"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
+                    val ab = bObj["AB"]?.jsonPrimitive?.intOrNull ?: 0
+                    val r = bObj["R"]?.jsonPrimitive?.intOrNull ?: 0
+                    val h = bObj["H"]?.jsonPrimitive?.intOrNull ?: 0
+                    val rbi = bObj["RBI"]?.jsonPrimitive?.intOrNull ?: 0
+                    val b4s = bObj["B4S"]?.jsonPrimitive?.intOrNull ?: 0
+                    val k = bObj["K"]?.jsonPrimitive?.intOrNull ?: 0
+                    val wo = bObj["WO"]?.jsonPrimitive?.intOrNull ?: 0
+                    val sb = bObj["SB"]?.jsonPrimitive?.intOrNull ?: 0
+                    val avg = bObj["AVG"]?.jsonPrimitive?.doubleOrNull
+                    val ops = bObj["OPS"]?.jsonPrimitive?.doubleOrNull
+                    BatterBoxItem(pid, bName, num, ord, posList, rolesList, ab, r, h, rbi, b4s, k, wo, sb, avg, ops)
+                }.sortedBy { it.order }
+
+                val pitchersArr = tObj["pitchers"]?.jsonArray ?: emptyList()
+                val pitchers = pitchersArr.mapNotNull { pElem ->
+                    val pObj = pElem.jsonObject
+                    val pid = pObj["playerId"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                    val pName = pObj["name"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val num = pObj["jersey_number"]?.jsonPrimitive?.intOrNull
+                    val desList = pObj["designations"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
+                    val ipStr = pObj["IP"]?.jsonPrimitive?.contentOrNull ?: "0.0"
+                    val ph = pObj["H"]?.jsonPrimitive?.intOrNull ?: 0
+                    val pr = pObj["R"]?.jsonPrimitive?.intOrNull ?: 0
+                    val er = pObj["ER"]?.jsonPrimitive?.intOrNull ?: 0
+                    val bb = pObj["BB"]?.jsonPrimitive?.intOrNull
+                    val pk = pObj["K"]?.jsonPrimitive?.intOrNull ?: 0
+                    val era = pObj["ERA"]?.jsonPrimitive?.doubleOrNull
+                    val mpi = pObj["MPI"]?.jsonPrimitive?.contentOrNull
+                    PitcherBoxItem(pid, pName, num, desList, ipStr, ph, pr, er, bb, pk, era, mpi)
+                }
+
+                val teamDetail = TeamGameDetail(
+                    teamId = tId,
+                    name = tName,
+                    abbreviation = tAbbr,
+                    logo = tLogo,
+                    isHomeTeam = isHome,
+                    pointsRegular = ptsReg,
+                    pointsShowdown = ptsSd,
+                    pointsTotal = ptsTotal,
+                    runsTotal = runsTotal,
+                    hitsTotal = hitsTotal,
+                    innings = innings,
+                    showdownRounds = showdowns,
+                    batters = batters,
+                    pitchers = pitchers
+                )
+
+                if (isHome) {
+                    homeDetail = teamDetail
+                } else {
+                    awayDetail = teamDetail
+                }
+            }
+
+            val finalHome = homeDetail ?: TeamGameDetail("", "Home Team", "HOME", null, true, 0, 0, 0, 0, 0, emptyList(), emptyList(), emptyList(), emptyList())
+            val finalAway = awayDetail ?: TeamGameDetail("", "Away Team", "AWAY", null, false, 0, 0, 0, 0, 0, emptyList(), emptyList(), emptyList(), emptyList())
+
+            GameDetail(
+                gameId = gameId,
+                status = status,
+                venue = venue,
+                numberOfInnings = numInnings,
+                equalizerPointAwarded = eqAwarded,
+                equalizerPointInning = eqInning,
+                homeTeam = finalHome,
+                awayTeam = finalAway,
+                notes = notes
+            )
         }
     }
 

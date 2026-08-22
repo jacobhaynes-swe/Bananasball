@@ -44,4 +44,8 @@ class MockScheduleScraper : ScheduleScraper {
             )
         )
     }
+
+    override suspend fun fetchGameBoxScore(gameId: String): Result<com.example.bananasball.domain.model.GameDetail> {
+        return Result.failure(NoSuchElementException("Mock scraper has no box scores"))
+    }
 }

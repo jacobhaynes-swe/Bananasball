@@ -45,6 +45,37 @@ class ScheduleViewModel(
             is ScheduleIntent.OnWatchLiveClicked -> {
                 // Side effect handled by UI or Navigator
             }
+            is ScheduleIntent.OnGameClicked -> {
+                val game = intent.game
+                _state.update { 
+                    it.copy(
+                        selectedGame = game,
+                        selectedGameDetail = null,
+                        isLoadingDetail = game.statsGameId != null,
+                        detailError = null
+                    )
+                }
+                if (game.statsGameId != null) {
+                    viewModelScope.launch {
+                        val result = repository.getGameDetail(game.statsGameId)
+                        result.onSuccess { detail ->
+                            _state.update { it.copy(selectedGameDetail = detail, isLoadingDetail = false) }
+                        }.onFailure { err ->
+                            _state.update { it.copy(detailError = err.message, isLoadingDetail = false) }
+                        }
+                    }
+                }
+            }
+            ScheduleIntent.OnDismissGameDetail -> {
+                _state.update {
+                    it.copy(
+                        selectedGame = null,
+                        selectedGameDetail = null,
+                        isLoadingDetail = false,
+                        detailError = null
+                    )
+                }
+            }
         }
     }
 

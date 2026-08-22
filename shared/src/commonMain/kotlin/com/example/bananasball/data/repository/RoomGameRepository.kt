@@ -5,6 +5,7 @@ import com.example.bananasball.data.mapper.toDomain
 import com.example.bananasball.data.mapper.toEntity
 import com.example.bananasball.data.remote.ScheduleScraper
 import com.example.bananasball.domain.model.Game
+import com.example.bananasball.domain.model.GameDetail
 import com.example.bananasball.domain.repository.GameRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -23,6 +24,10 @@ class RoomGameRepository(
 
     override suspend fun refreshSchedule(): Result<Unit> = runCatching {
         sync()
+    }
+
+    override suspend fun getGameDetail(gameId: String): Result<GameDetail> {
+        return scraper.fetchGameBoxScore(gameId)
     }
     
     suspend fun sync() {

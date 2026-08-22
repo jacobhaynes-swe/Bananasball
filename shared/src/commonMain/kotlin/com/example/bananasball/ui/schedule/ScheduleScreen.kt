@@ -6,7 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -121,12 +124,25 @@ fun ScheduleScreen(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(state.games, key = { it.id }) { game ->
-                            GameCard(game = game, onWatchLive = onWatchLive)
+                            GameCard(
+                                game = game,
+                                onWatchLive = onWatchLive,
+                                onGameClick = { viewModel.handleIntent(ScheduleIntent.OnGameClicked(game)) }
+                            )
                         }
                     }
                 }
             }
         }
+    }
+
+    state.selectedGame?.let { selectedGame ->
+        GameDetailModalSheet(
+            game = selectedGame,
+            detail = state.selectedGameDetail,
+            isLoading = state.isLoadingDetail,
+            onDismiss = { viewModel.handleIntent(ScheduleIntent.OnDismissGameDetail) }
+        )
     }
 
     if (showDatePicker) {
@@ -166,46 +182,68 @@ fun DateRibbon(
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit
 ) {
-    val scrollState = rememberScrollState()
-    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-    val dates = remember(selectedDate) {
-        (-2..7).map { offset ->
-            selectedDate.plus(offset, DateTimeUnit.DAY)
+    val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
+    val dates = remember(today) {
+        (-14..28).map { offset ->
+            today.plus(offset, DateTimeUnit.DAY)
         }
     }
+    val listState = rememberLazyListState()
+    val density = LocalDensity.current
 
-    Row(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .horizontalScroll(scrollState)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        dates.forEach { date ->
-            val isSelected = date == selectedDate
-            Column(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (isSelected) Color(0xFFFFE000) else Color.White.copy(alpha = 0.15f)
-                    )
-                    .clickable { onDateSelected(date) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = date.dayOfWeek.name.take(3),
-                    color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.8f),
-                    fontSize = 11.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                )
-                Text(
-                    text = date.day.toString(),
-                    color = if (isSelected) Color.Black else Color.White,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 16.sp
-                )
+        val screenWidthPx = with(density) { maxWidth.toPx() }
+        val itemWidthPx = with(density) { 56.dp.toPx() }
+        val centerOffsetPx = ((screenWidthPx - itemWidthPx) / 2).toInt()
+
+        val selectedIndex = remember(dates, selectedDate) {
+            dates.indexOf(selectedDate).takeIf { it >= 0 } ?: dates.indexOf(today).coerceAtLeast(0)
+        }
+
+        LaunchedEffect(selectedDate) {
+            listState.animateScrollToItem(
+                index = selectedIndex,
+                scrollOffset = -centerOffsetPx
+            )
+        }
+
+        LazyRow(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp)
+        ) {
+            items(dates, key = { it.toString() }) { date ->
+                val isSelected = date == selectedDate
+                Surface(
+                    onClick = { onDateSelected(date) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isSelected) Color(0xFFFFE000) else Color.White.copy(alpha = 0.15f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = date.dayOfWeek.name.take(3),
+                            color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.8f),
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                        Text(
+                            text = date.day.toString(),
+                            color = if (isSelected) Color.Black else Color.White,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
             }
         }
     }
@@ -214,13 +252,17 @@ fun DateRibbon(
 @Composable
 fun GameCard(
     game: Game,
-    onWatchLive: (String) -> Unit
+    onWatchLive: (String) -> Unit,
+    onGameClick: () -> Unit = {}
 ) {
     val isLiveGame = game.boxScore.status.equals("Live", ignoreCase = true) || 
                      (game.streamingMetadata?.isLiveBroadcast == true)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onGameClick() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -304,8 +346,6 @@ fun GameCard(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             LivePulsingBadge()
-                            // Inning and outs display temporarily commented out until live bullpen data is available
-                            /*
                             game.boxScore.inningDisplay?.let { inningText ->
                                 Surface(
                                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -320,17 +360,18 @@ fun GameCard(
                                     )
                                 }
                             }
-                            */
                         }
                     } else {
+                        val status = game.boxScore.status.uppercase()
+                        val isFinal = status == "FINAL"
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            color = if (isFinal) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = game.boxScore.status.uppercase(),
+                                text = status,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (isFinal) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -461,21 +502,38 @@ fun GameCard(
                     }
                 }
                 
-                if (game.youtubeUrl != null) {
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = { onWatchLive(game.youtubeUrl) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isLiveGame) Color(0xFFCC0000) else MaterialTheme.colorScheme.secondary
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onGameClick,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFFFE000)
                         ),
-                        shape = RoundedCornerShape(10.dp)
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFE000).copy(alpha = 0.6f))
                     ) {
-                        Text(
-                            text = if (isLiveGame) "▶ WATCH LIVE ON YOUTUBE" else "▶ OPEN YOUTUBE STREAM",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        Text("📊 Box Score", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                    if (game.youtubeUrl != null) {
+                        Button(
+                            onClick = { onWatchLive(game.youtubeUrl) },
+                            modifier = Modifier.weight(1.3f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isLiveGame) Color(0xFFCC0000) else MaterialTheme.colorScheme.secondary
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = if (isLiveGame) "▶ Watch Live" else "▶ Stream",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }
