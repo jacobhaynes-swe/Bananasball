@@ -18,3 +18,4 @@ build
 /androidApp/build
 /shared/build
 .kotlin/
+FELLOWSHIP_LOG.md
