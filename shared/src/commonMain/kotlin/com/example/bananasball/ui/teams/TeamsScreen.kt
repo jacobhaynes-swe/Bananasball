@@ -48,7 +48,7 @@ fun TeamsScreen(
     ) { padding ->
         if (state.isLoading && state.teams.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                com.example.bananasball.ui.components.SpinningBaseballLoader(text = "Loading Teams...")
             }
         } else {
             LazyColumn(

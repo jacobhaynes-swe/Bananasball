@@ -9,7 +9,7 @@ import kotlinx.datetime.DateTimeUnit
 
 @OptIn(ExperimentalTime::class)
 class MockScheduleScraper : ScheduleScraper {
-    override suspend fun fetchSchedule(): List<ScrapedGame> {
+    override suspend fun fetchBaseSchedule(): List<ScrapedGame> {
         val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
         return listOf(
             ScrapedGame(
@@ -44,6 +44,10 @@ class MockScheduleScraper : ScheduleScraper {
             )
         )
     }
+
+    override suspend fun enrichLiveStreams(games: List<ScrapedGame>): List<ScrapedGame> = games
+
+    override suspend fun fetchSchedule(): List<ScrapedGame> = fetchBaseSchedule()
 
     override suspend fun fetchGameBoxScore(gameId: String): Result<com.example.bananasball.domain.model.GameDetail> {
         return Result.failure(NoSuchElementException("Mock scraper has no box scores"))

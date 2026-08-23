@@ -1,6 +1,7 @@
 package com.example.bananasball.ui.schedule
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -15,18 +16,25 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.example.bananasball.domain.model.Game
+import com.example.bananasball.ui.components.BananaPullToRefreshIndicator
+import com.example.bananasball.ui.components.SpinningBaseballLoader
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.time.ExperimentalTime
@@ -76,12 +84,20 @@ fun ScheduleScreen(
                 onDateSelected = { viewModel.handleIntent(ScheduleIntent.OnDateSelected(it)) }
             )
 
+            val pullToRefreshState = rememberPullToRefreshState()
             PullToRefreshBox(
+                state = pullToRefreshState,
                 isRefreshing = state.isLoading,
                 onRefresh = { viewModel.handleIntent(ScheduleIntent.OnRefresh) },
+                indicator = {
+                    BananaPullToRefreshIndicator(
+                        state = pullToRefreshState,
+                        isRefreshing = state.isLoading
+                    )
+                },
                 modifier = Modifier.fillMaxSize()
             ) {
-                if (state.games.isEmpty() && !state.isLoading) {
+                if (state.games.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -89,33 +105,40 @@ fun ScheduleScreen(
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(32.dp).fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                        if (state.isLoading) {
+                            SpinningBaseballLoader(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                                text = "Loading Schedule..."
+                            )
+                        } else {
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                             ) {
-                                Text("🍌", fontSize = 48.sp)
-                                Spacer(Modifier.height(12.dp))
-                                Text(
-                                    text = "No Games Scheduled",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    text = "Check adjacent dates on the ribbon or use the calendar picker.",
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
+                                Column(
+                                    modifier = Modifier.padding(32.dp).fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text("🍌", fontSize = 48.sp)
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        text = "No Games Scheduled",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        text = "Check adjacent dates on the ribbon or use the calendar picker.",
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
                             }
                         }
                     }
@@ -428,12 +451,11 @@ fun GameCard(
 
                 Spacer(Modifier.height(14.dp))
 
-                // Dual Time Display & Banana Ball 2-Hour Clock
+                // Game & Stream Time Details
                 val streamStartTime = game.streamingMetadata?.actualStartTime
                 val gameStartTime = game.startTime
                 val hasDistinctStreamTime = streamStartTime != null && 
                     (streamStartTime.hour != gameStartTime.hour || streamStartTime.minute != gameStartTime.minute)
-                val timeRemaining = rememberBananaBallCountdown(gameStartTime, isLiveGame)
 
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -467,35 +489,6 @@ fun GameCard(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
                             )
-                        }
-
-                        if (timeRemaining != null) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                modifier = Modifier.padding(vertical = 2.dp)
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("⏱", fontSize = 12.sp)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = "2-Hour Game Clock:",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                                Text(
-                                    text = "$timeRemaining remaining",
-                                    fontSize = 12.sp,
-                                    color = Color(0xFFFFD700),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
                         }
 
                         if (hasDistinctStreamTime && streamStartTime != null) {
@@ -617,34 +610,7 @@ private fun formatLocalGameTime(dateTime: LocalDateTime): String {
     return "$hour12:$minuteStr $amPm"
 }
 
-@OptIn(ExperimentalTime::class)
-@Composable
-fun rememberBananaBallCountdown(gameStartTime: LocalDateTime, isLive: Boolean): String? {
-    if (!isLive) return null
-    val countdown by produceState<String?>(initialValue = null, key1 = gameStartTime, key2 = isLive) {
-        while (true) {
-            val now = Clock.System.now()
-            // First pitch is officially ~:02 past scheduled time (ceremonies/anthem)
-            val gameStartInstant = gameStartTime.toInstant(TimeZone.currentSystemDefault())
-            val firstPitchInstant = gameStartInstant.plus(kotlin.time.Duration.parse("2m"))
-            val elapsedSeconds = (now - firstPitchInstant).inWholeSeconds
 
-            value = if (elapsedSeconds in 0..7200) {
-                val remainingSeconds = 7200 - elapsedSeconds
-                val hours = remainingSeconds / 3600
-                val minutes = (remainingSeconds % 3600) / 60
-                val seconds = remainingSeconds % 60
-                "${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
-            } else if (elapsedSeconds < 0 && elapsedSeconds > -900) {
-                "2:00:00"
-            } else {
-                null
-            }
-            kotlinx.coroutines.delay(1000)
-        }
-    }
-    return countdown
-}
 
 @Composable
 fun TeamRow(

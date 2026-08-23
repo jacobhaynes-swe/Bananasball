@@ -27,7 +27,7 @@ A professional-ish fan app for the **Banana Ball** league, allowing fans to quic
 
 ### Live Game Scorecard & Banana Ball Scorebug
 - **Banana Ball Scoring**: Tracks both inning-by-inning points (`PTS`) and cumulative game action (`Runs` & `Hits`).
-- **2-Hour Game Clock**: Live, second-by-second countdown clock counting down from the official Banana Ball 2-hour hard time limit.
+- **Gameday Inning Scorebug**: Live inning notation (▲ / ▼), points, runs, and hits derived dynamically from live scoring feeds.
 - **Dual-Time Display**: Separates Game Start (First Pitch) from Stream Broadcast start times, converted accurately from venue timezones (MST, EDT, CDT) to local device time.
 - **Pulsing Live Status**: Dynamic pulsing indicators for games currently in progress.
 

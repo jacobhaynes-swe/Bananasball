@@ -20,7 +20,8 @@ class ScheduleViewModel(
 
     private val _state = MutableStateFlow(
         ScheduleState(
-            selectedDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+            selectedDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
+            isLoading = true
         )
     )
     val state: StateFlow<ScheduleState> = _state.asStateFlow()
@@ -84,7 +85,13 @@ class ScheduleViewModel(
         observeJob = viewModelScope.launch {
             repository.getGamesForDate(_state.value.selectedDate)
                 .onEach { games ->
-                    _state.update { it.copy(games = games, isLoading = false) }
+                    val sorted = games.sortedBy { it.startTime }
+                    _state.update { 
+                        it.copy(
+                            games = sorted,
+                            isLoading = if (sorted.isNotEmpty()) false else it.isLoading
+                        ) 
+                    }
                 }
                 .launchIn(this)
         }

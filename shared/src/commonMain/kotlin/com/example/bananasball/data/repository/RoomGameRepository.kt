@@ -31,14 +31,18 @@ class RoomGameRepository(
     }
     
     suspend fun sync() {
-        println("Repository: Starting sync...")
-        val scrapedGames = scraper.fetchSchedule()
-        println("Repository: Scraped ${scrapedGames.size} games")
-        if (scrapedGames.isNotEmpty()) {
-            gameDao.replaceAllGames(scrapedGames.map { it.toEntity() })
-            println("Repository: Sync complete (${scrapedGames.size} games saved)")
-        } else {
-            println("Repository: Scraped 0 games, preserving existing cached games")
+        println("Repository: Starting immediate base schedule sync...")
+        val baseGames = scraper.fetchBaseSchedule()
+        if (baseGames.isNotEmpty()) {
+            gameDao.replaceAllGames(baseGames.map { it.toEntity() })
+            println("Repository: Base schedule sync complete (${baseGames.size} games saved to Room)")
+        }
+
+        println("Repository: Enriching live streams & hype counters in background...")
+        val enrichedGames = scraper.enrichLiveStreams(baseGames.ifEmpty { scraper.fetchBaseSchedule() })
+        if (enrichedGames.isNotEmpty()) {
+            gameDao.replaceAllGames(enrichedGames.map { it.toEntity() })
+            println("Repository: Stream enrichment complete (${enrichedGames.size} games updated in Room)")
         }
     }
 }

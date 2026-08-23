@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -23,6 +24,8 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.example.bananasball.domain.model.StatLeader
 import com.example.bananasball.domain.model.TeamStandings
+import com.example.bananasball.ui.components.BananaPullToRefreshIndicator
+import com.example.bananasball.ui.components.SpinningBaseballLoader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,61 +36,87 @@ fun StatsScreen(
 
     Scaffold(
         topBar = {
-            Column(Modifier.background(MaterialTheme.colorScheme.secondary)) {
+            Column(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.background)
+                    .fillMaxWidth()
+            ) {
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            text = "LEAGUE STATS",
-                            color = MaterialTheme.colorScheme.primary,
+                            text = "LEAGUE HUB",
                             fontWeight = FontWeight.Black,
+                            fontSize = 22.sp,
+                            color = Color(0xFFFFE000),
                             letterSpacing = 2.sp
                         )
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                         containerColor = Color.Transparent
                     )
                 )
 
-                // Sub-tabs
-                Row(
+                // Segmented Tabs
+                Surface(
+                    color = Color.White.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 ) {
-                    StatsTab.values().forEach { tab ->
-                        val isSelected = state.selectedTab == tab
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.handleIntent(StatsIntent.OnTabSelected(tab)) },
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = tab.title,
-                                modifier = Modifier.padding(vertical = 10.dp),
-                                textAlign = TextAlign.Center,
-                                color = if (isSelected) Color.Black else Color.White,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 12.sp
-                            )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatsTab.values().forEach { tab ->
+                            val isSelected = state.selectedTab == tab
+                            Surface(
+                                onClick = { viewModel.handleIntent(StatsIntent.OnTabSelected(tab)) },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) Color(0xFFFFE000) else Color.Transparent,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = tab.title,
+                                    color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.8f),
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     ) { padding ->
+        val pullToRefreshState = rememberPullToRefreshState()
         PullToRefreshBox(
+            state = pullToRefreshState,
             isRefreshing = state.isLoading,
             onRefresh = { viewModel.handleIntent(StatsIntent.OnRefresh) },
+            indicator = {
+                BananaPullToRefreshIndicator(
+                    state = pullToRefreshState,
+                    isRefreshing = state.isLoading
+                )
+            },
             modifier = Modifier.fillMaxSize().padding(padding)
         ) {
-            when (state.selectedTab) {
-                StatsTab.STANDINGS -> StandingsTab(standings = state.standings?.rankings ?: emptyList())
-                StatsTab.BATTING -> BattingLeadersTab(leaders = state.seasonStats?.battingLeaders ?: emptyList())
-                StatsTab.PITCHING -> PitchingLeadersTab(leaders = state.seasonStats?.pitchingLeaders ?: emptyList())
+            val isInitialLoading = state.isLoading && (state.standings == null && state.seasonStats == null)
+            if (isInitialLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    SpinningBaseballLoader(text = "Loading League Stats...")
+                }
+            } else {
+                when (state.selectedTab) {
+                    StatsTab.STANDINGS -> StandingsTab(standings = state.standings?.rankings ?: emptyList())
+                    StatsTab.BATTING -> BattingLeadersTab(leaders = state.seasonStats?.battingLeaders ?: emptyList())
+                    StatsTab.PITCHING -> PitchingLeadersTab(leaders = state.seasonStats?.pitchingLeaders ?: emptyList())
+                }
             }
         }
     }

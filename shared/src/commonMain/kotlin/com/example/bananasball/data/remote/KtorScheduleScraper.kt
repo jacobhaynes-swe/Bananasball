@@ -24,11 +24,9 @@ class KtorScheduleScraper(
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    @OptIn(ExperimentalTime::class)
-    override suspend fun fetchSchedule(): List<ScrapedGame> {
-        println("Scraper: Fetching schedule and live games...")
+    override suspend fun fetchBaseSchedule(): List<ScrapedGame> {
+        println("Scraper: Fetching base schedule and scores...")
         val gamesMap = LinkedHashMap<String, ScrapedGame>()
-        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 
         // 1. Fetch from official Stats Games API (gives live in-progress, today's games, and completed games)
         val apiGames = fetchGamesFromApi()
@@ -53,15 +51,21 @@ class KtorScheduleScraper(
             }
         }
 
-        // 3. For Today's games or LIVE games, enrich with real-time YouTube stream metadata & live viewers
+        return gamesMap.values.toList()
+    }
+
+    @OptIn(ExperimentalTime::class)
+    override suspend fun enrichLiveStreams(games: List<ScrapedGame>): List<ScrapedGame> {
+        println("Scraper: Enriching live streams and hype counters...")
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
         val enrichedGames = mutableListOf<ScrapedGame>()
-        for (game in gamesMap.values) {
+
+        for (game in games) {
             val parsedLocalDate = parseDate(game.date)
             val isTodayOrLive = parsedLocalDate == today || game.status?.contains("Live", ignoreCase = true) == true
 
             if (isTodayOrLive || isWithinNextDays(game.date, 1)) {
                 val candidate = discoverEnrichedMetadata(game.youtubeUrl ?: "", game.teamCodes, parsedLocalDate, today)
-                println("Scraper: candidate for ${game.youtubeUrl} -> viewerCount=${candidate?.viewerCount}, isLive=${candidate?.isLiveBroadcast}, title=${candidate?.title}")
                 if (candidate != null && (matchesGameDate(candidate, parsedLocalDate, today) || candidate.isLiveBroadcast)) {
                     val isLiveNow = candidate.isLiveBroadcast || (game.status?.equals("LIVE", ignoreCase = true) == true)
                     val updatedStatus = if (game.status?.equals("Final", ignoreCase = true) == true) "Final" else if (isLiveNow) "LIVE" else game.status ?: "Scheduled"
@@ -87,9 +91,44 @@ class KtorScheduleScraper(
         return enrichedGames
     }
 
+    override suspend fun fetchSchedule(): List<ScrapedGame> {
+        val base = fetchBaseSchedule()
+        return enrichLiveStreams(base)
+    }
+
+    private var cachedVenues: Map<String, String>? = null
+
+    private suspend fun getVenuesMap(): Map<String, String> {
+        cachedVenues?.let { return it }
+        return try {
+            val url = "https://banana-stats-pages-seven.vercel.app/api/directus-items/venues"
+            val response = httpClient.get(url).bodyAsText()
+            val root = json.parseToJsonElement(response).jsonArray
+            val map = mutableMapOf<String, String>()
+            for (elem in root) {
+                val obj = elem.jsonObject
+                val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: continue
+                val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: continue
+                val city = obj["city"]?.jsonPrimitive?.contentOrNull?.trim()
+                val state = obj["state"]?.jsonPrimitive?.contentOrNull?.trim()
+                val locationStr = when {
+                    !city.isNullOrBlank() && !state.isNullOrBlank() -> "$name • $city, $state"
+                    !city.isNullOrBlank() -> "$name • $city"
+                    else -> name
+                }
+                map[id] = locationStr
+            }
+            cachedVenues = map
+            map
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
     private suspend fun fetchGamesFromApi(): List<ScrapedGame> {
         val list = mutableListOf<ScrapedGame>()
         try {
+            val venuesMap = getVenuesMap()
             val url = "https://banana-stats-pages-seven.vercel.app/api/stats/games"
             val response = httpClient.get(url).bodyAsText()
             val root = json.parseToJsonElement(response).jsonArray
@@ -100,6 +139,9 @@ class KtorScheduleScraper(
                 val rawTime = obj["time"]?.jsonPrimitive?.contentOrNull ?: "19:00:00"
                 val venueTz = obj["venue_timezone"]?.jsonPrimitive?.contentOrNull ?: ""
                 val time = if (venueTz.isNotBlank()) "$rawTime $venueTz" else rawTime
+
+                val venueId = obj["venue_id"]?.jsonPrimitive?.contentOrNull
+                val location = if (venueId != null) venuesMap[venueId] ?: "" else ""
 
                 val rawStatus = obj["status"]?.jsonPrimitive?.contentOrNull ?: "scheduled"
                 val displayStatus = when (rawStatus.lowercase()) {
@@ -130,10 +172,26 @@ class KtorScheduleScraper(
                 val homeHits = homeObj?.get("hits")?.jsonPrimitive?.intOrNull
                 val awayHits = awayObj?.get("hits")?.jsonPrimitive?.intOrNull
 
-                val homeIp = homeObj?.get("starting_pitcher")?.jsonObject?.get("innings_pitched")?.jsonPrimitive?.doubleOrNull?.toFloat()
-                val awayIp = awayObj?.get("starting_pitcher")?.jsonObject?.get("innings_pitched")?.jsonPrimitive?.doubleOrNull?.toFloat()
+                val spHomeIp = homeObj?.get("starting_pitcher")?.jsonObject?.get("innings_pitched")?.jsonPrimitive?.doubleOrNull?.toFloat()
+                val spAwayIp = awayObj?.get("starting_pitcher")?.jsonObject?.get("innings_pitched")?.jsonPrimitive?.doubleOrNull?.toFloat()
 
-                val (inning, half, outs, display) = deriveInningState(homeIp, awayIp, displayStatus)
+                // If game is live, enrich with full bullpen IP sum and line score from box-score endpoint
+                val boxSummary = if (displayStatus == "LIVE" && gameId != null) {
+                    fetchLiveBoxScoreSummary(gameId)
+                } else null
+
+                val effectiveHomeIp = boxSummary?.homeTotalIp ?: spHomeIp
+                val effectiveAwayIp = boxSummary?.awayTotalIp ?: spAwayIp
+                val maxScored = boxSummary?.maxScoredInning ?: 0
+
+                val effectiveHomePts = boxSummary?.homePoints ?: homePoints
+                val effectiveAwayPts = boxSummary?.awayPoints ?: awayPoints
+                val effectiveHomeRuns = boxSummary?.homeRuns ?: homeRuns
+                val effectiveAwayRuns = boxSummary?.awayRuns ?: awayRuns
+                val effectiveHomeHits = boxSummary?.homeHits ?: homeHits
+                val effectiveAwayHits = boxSummary?.awayHits ?: awayHits
+
+                val (inning, half, outs, display) = deriveInningState(effectiveHomeIp, effectiveAwayIp, displayStatus, maxScored)
 
                 val teamCodes = listOf(homeCode, awayCode)
                 val channelUrl = com.example.bananasball.data.repository.StaticTeamProvider.getChannelUrl(homeCode)
@@ -141,18 +199,18 @@ class KtorScheduleScraper(
                 list.add(
                     ScrapedGame(
                         date = date,
-                        location = "",
+                        location = location,
                         time = time,
                         teamCodes = teamCodes,
                         youtubeUrl = channelUrl,
-                        homeScore = homePoints,
-                        awayScore = awayPoints,
+                        homeScore = effectiveHomePts,
+                        awayScore = effectiveAwayPts,
                         status = displayStatus,
                         isLiveBroadcast = displayStatus.equals("LIVE", ignoreCase = true),
-                        awayRuns = awayRuns,
-                        homeRuns = homeRuns,
-                        awayHits = awayHits,
-                        homeHits = homeHits,
+                        awayRuns = effectiveAwayRuns,
+                        homeRuns = effectiveHomeRuns,
+                        awayHits = effectiveAwayHits,
+                        homeHits = effectiveHomeHits,
                         currentInning = inning,
                         inningHalf = half,
                         outs = outs,
@@ -167,9 +225,105 @@ class KtorScheduleScraper(
         return list
     }
 
+    private data class BoxScoreSummary(
+        val homeTotalIp: Float?,
+        val awayTotalIp: Float?,
+        val maxScoredInning: Int,
+        val homePoints: Int?,
+        val awayPoints: Int?,
+        val homeRuns: Int?,
+        val awayRuns: Int?,
+        val homeHits: Int?,
+        val awayHits: Int?
+    )
+
+    private suspend fun fetchLiveBoxScoreSummary(gameId: String): BoxScoreSummary? {
+        return try {
+            val url = "https://banana-stats-pages-seven.vercel.app/api/directus-items/box-score?gameId=$gameId"
+            val response = httpClient.get(url).bodyAsText()
+            val root = json.parseToJsonElement(response).jsonObject
+            val teams = root["teams"]?.jsonArray ?: return null
+            var homeTotalIp: Float? = null
+            var awayTotalIp: Float? = null
+            var maxScoredInning = 0
+            var homePts: Int? = null
+            var awayPts: Int? = null
+            var homeR: Int? = null
+            var awayR: Int? = null
+            var homeH: Int? = null
+            var awayH: Int? = null
+
+            for (elem in teams) {
+                val t = elem.jsonObject
+                val isHome = t["isHomeTeam"]?.jsonPrimitive?.booleanOrNull ?: false
+                val prh = t["prh"]?.jsonObject
+                val pts = prh?.get("points_total")?.jsonPrimitive?.intOrNull
+                val runs = prh?.get("runs")?.jsonPrimitive?.intOrNull
+                val hits = prh?.get("hits")?.jsonPrimitive?.intOrNull
+
+                val pitchers = t["pitchers"]?.jsonArray
+                val ipList = mutableListOf<Float>()
+                pitchers?.forEach { p ->
+                    p.jsonObject["IP"]?.jsonPrimitive?.doubleOrNull?.toFloat()?.let { ipList.add(it) }
+                }
+                val totalIp = if (ipList.isNotEmpty()) sumBaseballIp(ipList) else 0f
+
+                val innings = t["lineScore"]?.jsonObject?.get("innings")?.jsonArray
+                innings?.forEach { inn ->
+                    val innObj = inn.jsonObject
+                    val innNum = innObj["inning"]?.jsonPrimitive?.intOrNull ?: 0
+                    val r = innObj["runs"]?.jsonPrimitive?.intOrNull ?: 0
+                    val h = innObj["hits"]?.jsonPrimitive?.intOrNull ?: 0
+                    val p = innObj["points_awarded"]?.jsonPrimitive?.intOrNull ?: 0
+                    if (r > 0 || h > 0 || p > 0) {
+                        maxScoredInning = maxOf(maxScoredInning, innNum)
+                    }
+                }
+
+                if (isHome) {
+                    homeTotalIp = totalIp
+                    homePts = pts
+                    homeR = runs
+                    homeH = hits
+                } else {
+                    awayTotalIp = totalIp
+                    awayPts = pts
+                    awayR = runs
+                    awayH = hits
+                }
+            }
+
+            BoxScoreSummary(
+                homeTotalIp = homeTotalIp,
+                awayTotalIp = awayTotalIp,
+                maxScoredInning = maxScoredInning,
+                homePoints = homePts,
+                awayPoints = awayPts,
+                homeRuns = homeR,
+                awayRuns = awayR,
+                homeHits = homeH,
+                awayHits = awayH
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun sumBaseballIp(pitchers: List<Float>): Float {
+        var totalOuts = 0
+        for (ip in pitchers) {
+            val full = ip.toInt()
+            val frac = ((ip - full) * 10f).roundToInt()
+            totalOuts += (full * 3) + frac
+        }
+        val fullInnings = totalOuts / 3
+        val remOuts = totalOuts % 3
+        return fullInnings + (remOuts / 10f)
+    }
+
     private data class InningState(val inning: Int?, val half: String?, val outs: Int?, val display: String?)
 
-    private fun deriveInningState(homeIp: Float?, awayIp: Float?, status: String): InningState {
+    private fun deriveInningState(homeIp: Float?, awayIp: Float?, status: String, maxScoredInning: Int = 0): InningState {
         if (!status.equals("LIVE", ignoreCase = true) || homeIp == null || awayIp == null) {
             return InningState(null, null, null, null)
         }
@@ -180,9 +334,14 @@ class KtorScheduleScraper(
         val awayFull = awayIp.toInt()
         val awayFrac = ((awayIp - awayFull) * 10f).roundToInt()
 
-        // If no innings pitched recorded at all, stats have not been entered yet
+        // If no innings pitched recorded at all, check if lineScore has recorded scores
         if (homeFull == 0 && homeFrac == 0 && awayFull == 0 && awayFrac == 0) {
-            return InningState(null, null, null, null)
+            return if (maxScoredInning > 0) {
+                val nextInning = maxScoredInning + 1
+                InningState(nextInning, null, 0, "$nextInning")
+            } else {
+                InningState(null, null, null, null)
+            }
         }
 
         // 1. Home team pitcher is actively pitching in Top half (Home pitches first).
@@ -197,13 +356,20 @@ class KtorScheduleScraper(
             return InningState(inning, "BOT", awayFrac, "▼ $inning")
         }
 
-        // 3. Both whole numbers
+        // 3. Both whole numbers or relief stats for one team lag behind
         return if (homeFull > awayFull) {
-            val inning = homeFull
-            InningState(inning, "BOT", 0, "▼ $inning")
+            val inning = maxOf(homeFull, maxScoredInning)
+            if (awayFull < homeFull - 1) {
+                InningState(inning, null, 0, "$inning")
+            } else {
+                InningState(inning, "BOT", 0, "▼ $inning")
+            }
         } else if (homeFull == awayFull && homeFull > 0) {
             val nextInning = homeFull + 1
             InningState(nextInning, "TOP", 0, "▲ $nextInning")
+        } else if (maxScoredInning > 0) {
+            val inning = maxScoredInning + 1
+            InningState(inning, null, 0, "$inning")
         } else {
             InningState(null, null, null, null)
         }

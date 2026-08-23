@@ -63,9 +63,9 @@ fun GameDetailModalSheet(
                         .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
-                        color = Color(0xFFFFE000),
-                        modifier = Modifier.size(36.dp)
+                    com.example.bananasball.ui.components.SpinningBaseballLoader(
+                        text = "Loading Official Box Score...",
+                        ballSize = 44.dp
                     )
                 }
             } else if (detail != null) {

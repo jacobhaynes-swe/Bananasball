@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GameDao {
-    @Query("SELECT * FROM games WHERE date = :date")
+    @Query("SELECT * FROM games WHERE date = :date ORDER BY startTime ASC")
     fun getGamesByDate(date: String): Flow<List<GameEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
