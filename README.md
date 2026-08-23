@@ -1,6 +1,6 @@
 # Bananasball 🍌⚾️
 
-A professional-ish fan app for the **Banana Ball** league, allowing fans to quickly watch backflip catches, trick plays, and all the yellow ball antics live.
+A professional-ish fan app for the **Banana Ball** league, allowing fans to easily follow along with and watch all the yellow ball antics live.
 
 <p align="center">
   <a href="https://github.com/jacobhaynes-swe/Bananasball/releases/latest">
