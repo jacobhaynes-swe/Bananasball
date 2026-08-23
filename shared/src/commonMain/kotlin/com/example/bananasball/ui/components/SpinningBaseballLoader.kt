@@ -3,6 +3,7 @@ package com.example.bananasball.ui.components
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -133,7 +134,8 @@ fun BoxScope.BananaPullToRefreshIndicator(
             distance * 360f
         }
 
-        val topOffset = ((distance.coerceIn(0f, 1.2f) * 52f).dp).coerceAtLeast(8.dp)
+        // Statically placed in the top negative space (12.dp) so it spins smoothly without bouncing
+        val topOffset = if (isRefreshing) 12.dp else (distance.coerceIn(0f, 1f) * 12f).dp
 
         Box(
             modifier = modifier
@@ -141,7 +143,10 @@ fun BoxScope.BananaPullToRefreshIndicator(
                 .offset(y = topOffset)
                 .size(42.dp)
                 .shadow(elevation = 6.dp, shape = CircleShape)
-                .background(Color(0xFF1E293B), CircleShape)
+                .background(
+                    if (isSystemInDarkTheme()) Color(0xFF1E293B) else Color(0xFFFFFFFF),
+                    CircleShape
+                )
                 .padding(6.dp),
             contentAlignment = Alignment.Center
         ) {

@@ -2,6 +2,7 @@ package com.example.bananasball.ui.stats
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,31 +39,33 @@ fun StatsScreen(
         topBar = {
             Column(
                 modifier = Modifier
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(MaterialTheme.colorScheme.secondary)
                     .fillMaxWidth()
+                    .padding(bottom = 8.dp)
             ) {
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
                             text = "LEAGUE HUB",
                             fontWeight = FontWeight.Black,
-                            fontSize = 22.sp,
+                            fontSize = 20.sp,
                             color = Color(0xFFFFE000),
                             letterSpacing = 2.sp
                         )
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = Color.Transparent
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        titleContentColor = Color(0xFFFFE000)
                     )
                 )
 
                 // Segmented Tabs
                 Surface(
-                    color = Color.White.copy(alpha = 0.08f),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.15f),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .padding(horizontal = 16.dp, vertical = 2.dp)
                 ) {
                     Row(
                         modifier = Modifier
@@ -80,7 +83,7 @@ fun StatsScreen(
                             ) {
                                 Text(
                                     text = tab.title,
-                                    color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.8f),
+                                    color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.85f),
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     fontSize = 13.sp,
                                     textAlign = TextAlign.Center,
@@ -346,7 +349,7 @@ fun BattingLeadersTab(leaders: List<StatLeader.Batting>, modifier: Modifier = Mo
                                 text = formatAvg(leader.avg),
                                 fontWeight = FontWeight.Black,
                                 fontSize = 22.sp,
-                                color = MaterialTheme.colorScheme.primary
+                                color = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.primary else Color(0xFF002D62)
                             )
                             Text(
                                 text = "BATTING AVG",
@@ -445,7 +448,7 @@ fun PitchingLeadersTab(leaders: List<StatLeader.Pitching>, modifier: Modifier = 
                                 text = formatDecimal(leader.era),
                                 fontWeight = FontWeight.Black,
                                 fontSize = 22.sp,
-                                color = MaterialTheme.colorScheme.primary
+                                color = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.primary else Color(0xFF002D62)
                             )
                             Text(
                                 text = "EARNED RUN AVG",

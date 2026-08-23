@@ -31,18 +31,33 @@ class RoomGameRepository(
     }
     
     suspend fun sync() {
-        println("Repository: Starting immediate base schedule sync...")
-        val baseGames = scraper.fetchBaseSchedule()
-        if (baseGames.isNotEmpty()) {
-            gameDao.replaceAllGames(baseGames.map { it.toEntity() })
-            println("Repository: Base schedule sync complete (${baseGames.size} games saved to Room)")
-        }
+        val gameCount = gameDao.getGameCount()
+        val isFirstLaunch = gameCount == 0
 
-        println("Repository: Enriching live streams & hype counters in background...")
-        val enrichedGames = scraper.enrichLiveStreams(baseGames.ifEmpty { scraper.fetchBaseSchedule() })
-        if (enrichedGames.isNotEmpty()) {
-            gameDao.replaceAllGames(enrichedGames.map { it.toEntity() })
-            println("Repository: Stream enrichment complete (${enrichedGames.size} games updated in Room)")
+        if (isFirstLaunch) {
+            println("Repository: First launch (0 games cached in Room). Starting initial base schedule load...")
+            val baseGames = scraper.fetchBaseSchedule()
+            if (baseGames.isNotEmpty()) {
+                gameDao.insertGames(baseGames.map { it.toEntity() })
+                println("Repository: Base schedule sync complete (${baseGames.size} games saved to Room)")
+            }
+
+            println("Repository: Enriching live streams & hype counters...")
+            val enrichedGames = scraper.enrichLiveStreams(baseGames.ifEmpty { scraper.fetchBaseSchedule() })
+            if (enrichedGames.isNotEmpty()) {
+                gameDao.insertGames(enrichedGames.map { it.toEntity() })
+                println("Repository: Stream enrichment complete (${enrichedGames.size} games updated in Room)")
+            }
+        } else {
+            println("Repository: Background poll / warm sync ($gameCount games in Room). Running single-pass non-destructive sync...")
+            val baseGames = scraper.fetchBaseSchedule()
+            if (baseGames.isNotEmpty()) {
+                val enrichedGames = scraper.enrichLiveStreams(baseGames)
+                if (enrichedGames.isNotEmpty()) {
+                    gameDao.insertGames(enrichedGames.map { it.toEntity() })
+                    println("Repository: Background sync complete (${enrichedGames.size} games smoothly updated in Room)")
+                }
+            }
         }
     }
 }

@@ -64,7 +64,7 @@ The web platform defines 6 top-level categories and dedicated subcategories:
     - `teamId`, `teamName`, `teamAbbreviation`, `teamLogo`, `isHomeTeam`
     - `prh`: `{ points_regular, points_sd, points_total, runs, hits }`
     - `lineScore`:
-      - `innings[]`: `[ { inning: 1, runs: 3, hits: 4, points_awarded: 1 }, ... ]` (9th inning awards 2 points)
+      - `innings[]`: `[ { inning: 1, runs: 3, hits: 4, points_awarded: 1 }, ... ]` (In the final inning, every run scored counts as a point)
       - `showdown[]`: Round-by-round showdown tiebreaker results
     - `batters[]`:
       - `playerId`, `name`, `jersey_number`, `order` (1–10, 999 for subs)

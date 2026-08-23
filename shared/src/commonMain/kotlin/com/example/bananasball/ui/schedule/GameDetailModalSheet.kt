@@ -3,6 +3,7 @@ package com.example.bananasball.ui.schedule
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -201,7 +202,7 @@ private fun GameDetailHeader(game: Game, detail: GameDetail?) {
                             text = "$awayPts - $homePts",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Black,
-                            color = Color(0xFFFFE000)
+                            color = if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62)
                         )
                         val awayR = detail?.awayTeam?.runsTotal ?: game.boxScore.awayRuns
                         val homeR = detail?.homeTeam?.runsTotal ?: game.boxScore.homeRuns
@@ -217,7 +218,7 @@ private fun GameDetailHeader(game: Game, detail: GameDetail?) {
                             text = "VS",
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Black,
-                            color = Color(0xFFFFE000)
+                            color = if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62)
                         )
                     }
                 }
@@ -291,7 +292,7 @@ private fun LineScoreMatrix(detail: GameDetail) {
                 text = "INNING LINE SCORE",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFFFE000),
+                color = if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62),
                 letterSpacing = 0.5.sp
             )
             Spacer(Modifier.height(8.dp))
@@ -316,11 +317,11 @@ private fun LineScoreMatrix(detail: GameDetail) {
                                 modifier = Modifier.width(28.dp),
                                 textAlign = TextAlign.Center,
                                 fontWeight = if (i == 9) FontWeight.Bold else FontWeight.Normal,
-                                color = if (i == 9) Color(0xFFFFE000) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (i == 9) (if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62)) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp
                             )
                         }
-                        Text("PTS", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFFFFE000))
+                        Text("PTS", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62))
                         Text("R", modifier = Modifier.width(30.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
                         Text("H", modifier = Modifier.width(30.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
@@ -353,7 +354,7 @@ private fun LineScoreMatrix(detail: GameDetail) {
             
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "★ 9th Inning awards 2 points. Every regular inning won awards 1 point.",
+                text = "★ In the final inning (or 9th), every run counts as a point. Regular innings won award 1 point.",
                 fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
@@ -386,7 +387,7 @@ private fun InningTeamRow(
                 modifier = Modifier
                     .width(28.dp)
                     .then(
-                        if (pts > 0) Modifier.background(Color(0xFFFFE000).copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                        if (pts > 0) Modifier.background(if (isSystemInDarkTheme()) Color(0xFFFFE000).copy(alpha = 0.2f) else Color(0xFFFFE000).copy(alpha = 0.45f), RoundedCornerShape(4.dp))
                         else Modifier
                     ),
                 contentAlignment = Alignment.Center
@@ -394,12 +395,12 @@ private fun InningTeamRow(
                 Text(
                     text = runsText,
                     fontWeight = if (pts > 0) FontWeight.Bold else FontWeight.Normal,
-                    color = if (pts > 0) Color(0xFFFFE000) else MaterialTheme.colorScheme.onSurface,
+                    color = if (pts > 0) (if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62)) else MaterialTheme.colorScheme.onSurface,
                     fontSize = 12.sp
                 )
             }
         }
-        Text("$pointsTotal", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Black, fontSize = 13.sp, color = Color(0xFFFFE000))
+        Text("$pointsTotal", modifier = Modifier.width(36.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Black, fontSize = 13.sp, color = if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62))
         Text("$runsTotal", modifier = Modifier.width(30.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Medium, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
         Text("$hitsTotal", modifier = Modifier.width(30.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Medium, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
     }
@@ -502,7 +503,7 @@ private fun LineupTabContent(detail: GameDetail) {
             Text("R", modifier = Modifier.width(24.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("H", modifier = Modifier.width(24.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("RBI", modifier = Modifier.width(28.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("B4S", modifier = Modifier.width(32.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = Color(0xFFFFE000), fontWeight = FontWeight.Bold)
+            Text("B4S", modifier = Modifier.width(32.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62), fontWeight = FontWeight.Bold)
             Text("AVG", modifier = Modifier.width(44.dp), textAlign = TextAlign.End, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
@@ -549,7 +550,7 @@ private fun LineupTabContent(detail: GameDetail) {
                             Text(
                                 text = batter.positions.joinToString(", "),
                                 fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.primary
+                                color = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.primary else Color(0xFF002D62)
                             )
                         }
                     }
@@ -563,7 +564,7 @@ private fun LineupTabContent(detail: GameDetail) {
                         modifier = Modifier
                             .width(32.dp)
                             .then(
-                                if (batter.ballFourSprints > 0) Modifier.background(Color(0xFFFFE000).copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                if (batter.ballFourSprints > 0) Modifier.background(if (isSystemInDarkTheme()) Color(0xFFFFE000).copy(alpha = 0.2f) else Color(0xFFFFE000).copy(alpha = 0.45f), RoundedCornerShape(4.dp))
                                 else Modifier
                             ),
                         contentAlignment = Alignment.Center
@@ -572,7 +573,7 @@ private fun LineupTabContent(detail: GameDetail) {
                             text = "${batter.ballFourSprints}",
                             fontWeight = if (batter.ballFourSprints > 0) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 12.sp,
-                            color = if (batter.ballFourSprints > 0) Color(0xFFFFE000) else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (batter.ballFourSprints > 0) (if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62)) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -640,9 +641,9 @@ private fun PitchingTabContent(detail: GameDetail) {
             Text("H", modifier = Modifier.width(24.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("R", modifier = Modifier.width(24.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("ER", modifier = Modifier.width(24.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("K", modifier = Modifier.width(24.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = Color(0xFFFFE000), fontWeight = FontWeight.Bold)
+            Text("K", modifier = Modifier.width(24.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62), fontWeight = FontWeight.Bold)
             Text("ERA", modifier = Modifier.width(38.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("MPI", modifier = Modifier.width(42.dp), textAlign = TextAlign.End, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text("MPI", modifier = Modifier.width(42.dp), textAlign = TextAlign.End, fontSize = 11.sp, color = if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62), fontWeight = FontWeight.Bold)
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))

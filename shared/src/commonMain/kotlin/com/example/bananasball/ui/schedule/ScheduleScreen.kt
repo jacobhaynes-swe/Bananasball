@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -67,7 +68,7 @@ fun ScheduleScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = MaterialTheme.colorScheme.secondary,
                     titleContentColor = Color(0xFFFFE000)
                 )
             )
@@ -249,7 +250,7 @@ fun DateRibbon(
                 Surface(
                     onClick = { onDateSelected(date) },
                     shape = RoundedCornerShape(12.dp),
-                    color = if (isSelected) Color(0xFFFFE000) else Color.White.copy(alpha = 0.15f)
+                    color = if (isSelected) Color(0xFFFFE000) else MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Column(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -257,13 +258,13 @@ fun DateRibbon(
                     ) {
                         Text(
                             text = date.dayOfWeek.name.take(3),
-                            color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.8f),
+                            color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                         Text(
                             text = date.day.toString(),
-                            color = if (isSelected) Color.Black else Color.White,
+                            color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Black,
                             fontSize = 16.sp
                         )
@@ -532,9 +533,9 @@ fun GameCard(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFFFE000)
+                            contentColor = if (isSystemInDarkTheme()) Color(0xFFFFE000) else Color(0xFF002D62)
                         ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFE000).copy(alpha = 0.6f))
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSystemInDarkTheme()) Color(0xFFFFE000).copy(alpha = 0.6f) else Color(0xFF002D62).copy(alpha = 0.4f))
                     ) {
                         Text("📊 Box Score", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }

@@ -11,6 +11,9 @@ interface GameDao {
     @Query("SELECT * FROM games WHERE date = :date ORDER BY startTime ASC")
     fun getGamesByDate(date: String): Flow<List<GameEntity>>
 
+    @Query("SELECT COUNT(*) FROM games")
+    suspend fun getGameCount(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertGames(games: List<GameEntity>)
 

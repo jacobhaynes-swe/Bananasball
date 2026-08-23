@@ -34,7 +34,7 @@ A professional-ish fan app for the **Banana Ball** league, allowing fans to easi
 - **Graceful Stats Handling**: Unentered or delayed official stats are handled cleanly with status indicators rather than fabricated 0-0 scores.
 
 ### Interactive Gameday View (Box Score Sheet)
-- **Inning Line Score Matrix**: Frame-by-frame breakdown of points won per inning, including highlight badges for regular innings (1 pt) and the 9th inning golden rule (2 pts).
+- **Inning Line Score Matrix**: Frame-by-frame breakdown of points won per inning, including highlight badges for regular innings (1 pt) and the final inning rule where every run counts as a point.
 - **Lineup & Pitching Ledgers**: Expandable player cards showing At-Bats (`AB`), Runs (`R`), Hits (`H`), RBIs, Trick Plays (`B4S`), Batting Average, Innings Pitched (`IP`), Strikeouts (`SO`), and Earned Runs (`ER`).
 
 ### Fast Boot & Tiered Sync

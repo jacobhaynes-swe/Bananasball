@@ -86,10 +86,14 @@ class ScheduleViewModel(
             repository.getGamesForDate(_state.value.selectedDate)
                 .onEach { games ->
                     val sorted = games.sortedBy { it.startTime }
-                    _state.update { 
-                        it.copy(
+                    _state.update { curr ->
+                        val updatedSelectedGame = curr.selectedGame?.let { sel ->
+                            sorted.find { it.id == sel.id } ?: sel
+                        }
+                        curr.copy(
                             games = sorted,
-                            isLoading = if (sorted.isNotEmpty()) false else it.isLoading
+                            selectedGame = updatedSelectedGame,
+                            isLoading = if (sorted.isNotEmpty()) false else curr.isLoading
                         ) 
                     }
                 }
@@ -101,6 +105,14 @@ class ScheduleViewModel(
         _state.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             repository.refreshSchedule()
+            val currentSelectedGame = _state.value.selectedGame
+            val statsGameId = currentSelectedGame?.statsGameId
+            if (statsGameId != null) {
+                val detailResult = repository.getGameDetail(statsGameId)
+                detailResult.onSuccess { updatedDetail ->
+                    _state.update { it.copy(selectedGameDetail = updatedDetail) }
+                }
+            }
             _state.update { it.copy(isLoading = false) }
         }
     }
@@ -115,6 +127,15 @@ class ScheduleViewModel(
                     delay(45_000)
                     if (isActive) {
                         repository.refreshSchedule()
+                        // If the box score modal sheet is currently open, silently refresh its live stats detail
+                        val currentSelectedGame = _state.value.selectedGame
+                        val statsGameId = currentSelectedGame?.statsGameId
+                        if (statsGameId != null && currentSelectedGame.boxScore.status.contains("FINAL", ignoreCase = true) != true) {
+                            val detailResult = repository.getGameDetail(statsGameId)
+                            detailResult.onSuccess { updatedDetail ->
+                                _state.update { it.copy(selectedGameDetail = updatedDetail) }
+                            }
+                        }
                     }
                 }
             }
