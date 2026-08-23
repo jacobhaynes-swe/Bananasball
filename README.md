@@ -22,6 +22,11 @@ A professional-ish fan app for the **Banana Ball** league, allowing fans to quic
 
 ## Key Features
 
+### Real-Time Stream Discovery & Live Audiences
+- **Deep YouTube Broadcast Discovery**: Automatically scans official team channels (Savannah Bananas, Party Animals, Firefighters, Texas Tailgaters, Indianapolis Clowns, Loco Beach Coconuts) to extract direct livestream watch links and broadcast thumbnails.
+- **Dynamic Viewership Badges**: Displays pre-game waiting counters (`🔥 X waiting`) and live audience numbers (`🔴 2.6K watching`) directly on match cards.
+- **One-Click Native Launch**: Opens live broadcasts directly in the native YouTube app or web browser with zero navigation friction.
+
 ### Live Game Scorecards & Banana Ball Scorebug
 - **Banana Ball Point Tracking**: Displays both inning-by-inning points (`PTS`) and cumulative game action (`Runs` & `Hits`).
 - **Live Inning Intelligence**: Compact baseball notation (`▲ 3`, `▼ 7`) derived dynamically from line scores and aggregate bullpen innings pitched.
@@ -31,11 +36,6 @@ A professional-ish fan app for the **Banana Ball** league, allowing fans to quic
 ### Interactive Gameday View (Box Score Sheet)
 - **Inning Line Score Matrix**: Frame-by-frame breakdown of points won per inning, including highlight badges for regular innings (1 pt) and the 9th inning golden rule (2 pts).
 - **Lineup & Pitching Ledgers**: Expandable player cards showing At-Bats (`AB`), Runs (`R`), Hits (`H`), RBIs, Trick Plays (`B4S`), Batting Average, Innings Pitched (`IP`), Strikeouts (`SO`), and Earned Runs (`ER`).
-
-### Real-Time Stream Discovery & Live Audiences
-- **Deep YouTube Broadcast Discovery**: Automatically scans official team channels (Savannah Bananas, Party Animals, Firefighters, Texas Tailgaters, Indianapolis Clowns, Loco Beach Coconuts) to extract direct livestream watch links and broadcast thumbnails.
-- **Dynamic Viewership Badges**: Displays pre-game waiting counters (`🔥 X waiting`) and live audience numbers (`🔴 1.4K watching`) directly on match cards.
-- **One-Click Native Launch**: Opens live broadcasts directly in the native YouTube app or web browser.
 
 ### Fast Boot & Tiered Sync
 - **Sub-200ms Cold Start**: Tiered synchronization loads and displays the base schedule and matchups immediately, then enriches YouTube streams and audience counts asynchronously in the background.
