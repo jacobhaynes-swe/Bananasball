@@ -192,5 +192,140 @@ class KtorScheduleScraperTest {
         assertEquals(5800, game.viewerCount)
         assertEquals("Loco Beach Coconuts vs Savannah Bananas at Busch Stadium", game.streamTitle)
     }
+
+    @OptIn(ExperimentalTime::class)
+    @Test
+    fun testYtInitialDataChannelStreamParsing() = runTest {
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val todayMonthName = today.month.name.lowercase().replaceFirstChar { it.uppercase() }
+        val todayDay = today.day
+
+        val scheduleHtml = """
+        <div class="event_row" data-date="$today">
+            <div class="event_date"><p>Saturday, $todayMonthName $todayDay</p></div>
+            <div class="event_content">
+                <div class="col col_teams">
+                    <img alt="Loco Beach Coconuts"><span>vs</span><img alt="Savannah Bananas">
+                </div>
+                <div class="col col_stadium"><p>Busch Stadium <span class="game-time">@7:00pm CST</span></p></div>
+                <div class="col col_time"><p>7:00pm CST</p></div>
+                <div class="col col_watch"><p>SB YouTube</p></div>
+                <div class="col col_status"><p>Scheduled</p></div>
+            </div>
+        </div>
+        """.trimIndent()
+
+        val mockYtInitialDataChannelHtml = """
+        <!DOCTYPE html>
+        <html>
+        <body>
+        <script>
+        var ytInitialData = {
+          "contents": {
+            "twoColumnBrowseResultsRenderer": {
+              "tabs": [
+                {
+                  "tabRenderer": {
+                    "title": "Live",
+                    "selected": true,
+                    "content": {
+                      "richGridRenderer": {
+                        "contents": [
+                          {
+                            "richItemRenderer": {
+                              "content": {
+                                "lockupViewModel": {
+                                  "contentId": "HqhgHMg8M8U",
+                                  "metadata": {
+                                    "lockupMetadataViewModel": {
+                                      "title": {"content": "(Español) Loco Beach Coconuts vs Savannah Bananas at Busch Stadium in St. Louis! (Game 2)"},
+                                      "metadata": {
+                                        "contentMetadataViewModel": {
+                                          "metadataRows": [
+                                            {"metadataParts": [{"text": {"content": "73 watching"}}]}
+                                          ]
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "richItemRenderer": {
+                              "content": {
+                                "lockupViewModel": {
+                                  "contentId": "NCtOIhUkYvw",
+                                  "metadata": {
+                                    "lockupMetadataViewModel": {
+                                      "title": {"content": "Loco Beach Coconuts vs Savannah Bananas at Busch Stadium in St. Louis, MO! (Game 2)"},
+                                      "metadata": {
+                                        "contentMetadataViewModel": {
+                                          "metadataRows": [
+                                            {"metadataParts": [{"text": {"content": "15K watching"}}]}
+                                          ]
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        };</script>
+        </body>
+        </html>
+        """.trimIndent()
+
+        val mockEngine = MockEngine { request ->
+            val url = request.url.toString()
+            when {
+                url.contains("thesavannahbananas.com/schedule") -> respond(
+                    content = ByteReadChannel(scheduleHtml),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/html")
+                )
+                url.contains("youtube.com") -> respond(
+                    content = ByteReadChannel(mockYtInitialDataChannelHtml),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "text/html")
+                )
+                url.contains("stats/games") -> respond(
+                    content = ByteReadChannel("[]"),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+                else -> respond(
+                    content = ByteReadChannel(""),
+                    status = HttpStatusCode.OK
+                )
+            }
+        }
+
+        val scraper = KtorScheduleScraper(HttpClient(mockEngine))
+        val games = scraper.fetchSchedule()
+
+        assertEquals(1, games.size)
+        val game = games[0]
+
+        // English stream (NCtOIhUkYvw) must be selected with 15000 viewers and live status!
+        assertEquals("https://www.youtube.com/watch?v=NCtOIhUkYvw", game.youtubeUrl)
+        assertEquals(15000, game.viewerCount)
+        assertTrue(game.isLiveBroadcast)
+        assertEquals("LIVE", game.status)
+        assertEquals("Loco Beach Coconuts vs Savannah Bananas at Busch Stadium in St. Louis, MO! (Game 2)", game.streamTitle)
+        assertNull(game.inningDisplay)
+        assertNull(game.awayRuns)
+        assertNull(game.awayHits)
+    }
 }
 

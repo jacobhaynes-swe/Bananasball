@@ -69,8 +69,41 @@ fun GameDetailModalSheet(
                     )
                 }
             } else if (detail != null) {
+                val hasInnings = detail.homeTeam.innings.isNotEmpty() || detail.awayTeam.innings.isNotEmpty()
+                val hasBatters = detail.homeTeam.batters.any { it.atBats > 0 || it.hits > 0 } || detail.awayTeam.batters.any { it.atBats > 0 || it.hits > 0 }
+
+                if (!hasInnings && !hasBatters) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("ℹ️", fontSize = 16.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Official stats not provided yet for this game",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = "Live box score and in-game statistics will update as official scorers enter data.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
                 // Line Score Matrix Table
-                if (detail.homeTeam.innings.isNotEmpty() || detail.awayTeam.innings.isNotEmpty()) {
+                if (hasInnings) {
                     LineScoreMatrix(detail = detail)
                     Spacer(Modifier.height(20.dp))
                 }
@@ -139,6 +172,10 @@ private fun GameDetailHeader(game: Game, detail: GameDetail?) {
             Spacer(Modifier.height(12.dp))
 
             // Teams and Score Row
+            val hasStats = (detail != null && (detail.homeTeam.innings.isNotEmpty() || detail.awayTeam.innings.isNotEmpty() || detail.homeTeam.batters.any { it.atBats > 0 || it.hits > 0 })) || game.boxScore.hasOfficialStats
+            val awayPts = if (hasStats) (detail?.awayTeam?.pointsTotal ?: game.boxScore.awayScore) else null
+            val homePts = if (hasStats) (detail?.homeTeam?.pointsTotal ?: game.boxScore.homeScore) else null
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -148,30 +185,39 @@ private fun GameDetailHeader(game: Game, detail: GameDetail?) {
                 TeamBannerItem(
                     name = game.awayTeam.shortName,
                     logo = game.awayTeam.logoUrl,
-                    points = detail?.awayTeam?.pointsTotal ?: game.boxScore.awayScore
+                    points = awayPts
                 )
 
                 // VS or Points Divider
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "PTS",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "${detail?.awayTeam?.pointsTotal ?: game.boxScore.awayScore} - ${detail?.homeTeam?.pointsTotal ?: game.boxScore.homeScore}",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFFFFE000)
-                    )
-                    val awayR = detail?.awayTeam?.runsTotal ?: game.boxScore.awayRuns
-                    val homeR = detail?.homeTeam?.runsTotal ?: game.boxScore.homeRuns
-                    if (awayR != null && homeR != null) {
+                    if (hasStats && awayPts != null && homePts != null) {
                         Text(
-                            text = "($awayR - $homeR Runs)",
+                            text = "PTS",
                             fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "$awayPts - $homePts",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFFFFE000)
+                        )
+                        val awayR = detail?.awayTeam?.runsTotal ?: game.boxScore.awayRuns
+                        val homeR = detail?.homeTeam?.runsTotal ?: game.boxScore.homeRuns
+                        if (awayR != null && homeR != null) {
+                            Text(
+                                text = "($awayR - $homeR Runs)",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "VS",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFFFFE000)
                         )
                     }
                 }
@@ -180,7 +226,7 @@ private fun GameDetailHeader(game: Game, detail: GameDetail?) {
                 TeamBannerItem(
                     name = game.homeTeam.shortName,
                     logo = game.homeTeam.logoUrl,
-                    points = detail?.homeTeam?.pointsTotal ?: game.boxScore.homeScore
+                    points = homePts
                 )
             }
 
@@ -206,7 +252,7 @@ private fun GameDetailHeader(game: Game, detail: GameDetail?) {
 }
 
 @Composable
-private fun TeamBannerItem(name: String, logo: String?, points: Int) {
+private fun TeamBannerItem(name: String, logo: String?, points: Int? = null) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (!logo.isNullOrBlank()) {
             AsyncImage(

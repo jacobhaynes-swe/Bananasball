@@ -34,8 +34,11 @@ class RoomGameRepository(
         println("Repository: Starting sync...")
         val scrapedGames = scraper.fetchSchedule()
         println("Repository: Scraped ${scrapedGames.size} games")
-        gameDao.clearAllGames()
-        gameDao.insertGames(scrapedGames.map { it.toEntity() })
-        println("Repository: Sync complete")
+        if (scrapedGames.isNotEmpty()) {
+            gameDao.replaceAllGames(scrapedGames.map { it.toEntity() })
+            println("Repository: Sync complete (${scrapedGames.size} games saved)")
+        } else {
+            println("Repository: Scraped 0 games, preserving existing cached games")
+        }
     }
 }

@@ -16,4 +16,10 @@ interface GameDao {
 
     @Query("DELETE FROM games")
     suspend fun clearAllGames()
+
+    @androidx.room.Transaction
+    suspend fun replaceAllGames(games: List<GameEntity>) {
+        clearAllGames()
+        insertGames(games)
+    }
 }

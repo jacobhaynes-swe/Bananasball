@@ -6,7 +6,7 @@ import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
 import androidx.room.TypeConverters
 
-@Database(entities = [GameEntity::class, TeamEntity::class, StandingEntity::class], version = 9)
+@Database(entities = [GameEntity::class, TeamEntity::class, StandingEntity::class], version = 10)
 @ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun getGameDao(): GameDao

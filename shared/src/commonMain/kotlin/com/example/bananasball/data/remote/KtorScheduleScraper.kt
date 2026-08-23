@@ -62,14 +62,18 @@ class KtorScheduleScraper(
             if (isTodayOrLive || isWithinNextDays(game.date, 1)) {
                 val candidate = discoverEnrichedMetadata(game.youtubeUrl ?: "", game.teamCodes, parsedLocalDate, today)
                 println("Scraper: candidate for ${game.youtubeUrl} -> viewerCount=${candidate?.viewerCount}, isLive=${candidate?.isLiveBroadcast}, title=${candidate?.title}")
-                if (candidate != null && matchesGameDate(candidate, parsedLocalDate, today)) {
+                if (candidate != null && (matchesGameDate(candidate, parsedLocalDate, today) || candidate.isLiveBroadcast)) {
+                    val isLiveNow = candidate.isLiveBroadcast || (game.status?.equals("LIVE", ignoreCase = true) == true)
+                    val updatedStatus = if (game.status?.equals("Final", ignoreCase = true) == true) "Final" else if (isLiveNow) "LIVE" else game.status ?: "Scheduled"
+
                     enrichedGames.add(
                         game.copy(
                             youtubeUrl = candidate.directUrl,
                             thumbnailUrl = candidate.thumbnailUrl ?: game.thumbnailUrl,
                             waitingCount = candidate.waitingCount ?: game.waitingCount,
                             viewerCount = candidate.viewerCount ?: game.viewerCount,
-                            isLiveBroadcast = candidate.isLiveBroadcast || (game.status?.equals("LIVE", ignoreCase = true) == true),
+                            isLiveBroadcast = isLiveNow,
+                            status = updatedStatus,
                             actualStartTime = candidate.scheduledStartTime ?: game.actualStartTime,
                             streamTitle = candidate.title ?: game.streamTitle
                         )
@@ -86,7 +90,8 @@ class KtorScheduleScraper(
     private suspend fun fetchGamesFromApi(): List<ScrapedGame> {
         val list = mutableListOf<ScrapedGame>()
         try {
-            val response = httpClient.get("https://banana-stats-pages-seven.vercel.app/api/stats/games").bodyAsText()
+            val url = "https://banana-stats-pages-seven.vercel.app/api/stats/games"
+            val response = httpClient.get(url).bodyAsText()
             val root = json.parseToJsonElement(response).jsonArray
             for (elem in root) {
                 val obj = elem.jsonObject
@@ -175,6 +180,11 @@ class KtorScheduleScraper(
         val awayFull = awayIp.toInt()
         val awayFrac = ((awayIp - awayFull) * 10f).roundToInt()
 
+        // If no innings pitched recorded at all, stats have not been entered yet
+        if (homeFull == 0 && homeFrac == 0 && awayFull == 0 && awayFrac == 0) {
+            return InningState(null, null, null, null)
+        }
+
         // 1. Home team pitcher is actively pitching in Top half (Home pitches first).
         if (homeFrac in 1..2) {
             val inning = homeFull + 1
@@ -195,7 +205,7 @@ class KtorScheduleScraper(
             val nextInning = homeFull + 1
             InningState(nextInning, "TOP", 0, "▲ $nextInning")
         } else {
-            InningState(1, "TOP", 0, "▲ 1")
+            InningState(null, null, null, null)
         }
     }
 
@@ -430,6 +440,86 @@ class KtorScheduleScraper(
         return gameDate == today
     }
 
+    private fun parseCandidatesFromChannelHtml(channelHtml: String): List<EnrichedStreamMetadata> {
+        val candidates = mutableListOf<EnrichedStreamMetadata>()
+        val ytDataMatch = Regex("""(?:var\s+|window\["|window\.)ytInitialData(?:"]\s*|\s*)=\s*(\{.*?\});\s*</script>""", setOf(RegexOption.DOT_MATCHES_ALL)).find(channelHtml)
+        if (ytDataMatch != null) {
+            val jsonStr = ytDataMatch.groupValues[1]
+            try {
+                val root = json.parseToJsonElement(jsonStr).jsonObject
+                val tabs = root["contents"]?.jsonObject
+                    ?.get("twoColumnBrowseResultsRenderer")?.jsonObject
+                    ?.get("tabs")?.jsonArray ?: emptyList()
+
+                for (tabElem in tabs) {
+                    val tr = tabElem.jsonObject["tabRenderer"]?.jsonObject ?: continue
+                    val tabTitle = tr["title"]?.jsonPrimitive?.contentOrNull
+                    if (tabTitle == "Live" || tabTitle == "Streams" || tr["selected"]?.jsonPrimitive?.booleanOrNull == true) {
+                        val contents = tr["content"]?.jsonObject
+                            ?.get("richGridRenderer")?.jsonObject
+                            ?.get("contents")?.jsonArray ?: emptyList()
+
+                        for (itemElem in contents) {
+                            val rir = itemElem.jsonObject["richItemRenderer"]?.jsonObject ?: continue
+                            val lockup = rir["content"]?.jsonObject?.get("lockupViewModel")?.jsonObject ?: continue
+                            val videoId = lockup["contentId"]?.jsonPrimitive?.contentOrNull ?: continue
+
+                            val lockupMeta = lockup["metadata"]?.jsonObject?.get("lockupMetadataViewModel")?.jsonObject
+                            val title = lockupMeta?.get("title")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
+
+                            val rows = lockupMeta?.get("metadata")?.jsonObject
+                                ?.get("contentMetadataViewModel")?.jsonObject
+                                ?.get("metadataRows")?.jsonArray ?: emptyList()
+
+                            var isLive = false
+                            var viewerCount: Int? = null
+                            var waitingCount: Int? = null
+
+                            for (rElem in rows) {
+                                val parts = rElem.jsonObject["metadataParts"]?.jsonArray ?: emptyList()
+                                for (pElem in parts) {
+                                    val text = pElem.jsonObject["text"]?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull ?: ""
+                                    val lower = text.lowercase()
+                                    if (lower.contains("watching")) {
+                                        isLive = true
+                                        val cleaned = lower.substringBefore("watching").trim()
+                                        viewerCount = if (cleaned.contains("k")) {
+                                            (cleaned.replace("k", "").trim().toDoubleOrNull()?.times(1000))?.toInt()
+                                        } else {
+                                            cleaned.replace(Regex("[^0-9]"), "").toIntOrNull()
+                                        }
+                                    } else if (lower.contains("waiting")) {
+                                        val cleaned = lower.substringBefore("waiting").trim()
+                                        waitingCount = cleaned.replace(Regex("[^0-9]"), "").toIntOrNull()
+                                    }
+                                }
+                            }
+
+                            val directUrl = "https://www.youtube.com/watch?v=$videoId"
+                            val thumbUrl = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+
+                            candidates.add(
+                                EnrichedStreamMetadata(
+                                    videoId = videoId,
+                                    directUrl = directUrl,
+                                    thumbnailUrl = thumbUrl,
+                                    waitingCount = waitingCount,
+                                    viewerCount = viewerCount,
+                                    isLiveBroadcast = isLive,
+                                    scheduledStartTime = null,
+                                    title = title
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                println("Scraper: ytInitialData parse failed: ${e.message}")
+            }
+        }
+        return candidates
+    }
+
     private suspend fun discoverEnrichedMetadata(
         targetUrl: String,
         teamCodes: List<String> = emptyList(),
@@ -447,6 +537,8 @@ class KtorScheduleScraper(
                 videoIds.add(directVideoId)
             }
 
+            val candidates = mutableListOf<EnrichedStreamMetadata>()
+
             // Determine channel URL to scan for scheduled/live video IDs
             val channelUrl = when {
                 targetUrl.contains("youtube.com/@") || targetUrl.contains("youtube.com/c/") || targetUrl.contains("youtube.com/channel/") -> targetUrl
@@ -460,11 +552,16 @@ class KtorScheduleScraper(
                         headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                     }.bodyAsText()
 
-                    val videoIdRegex = Regex("(?:/watch\\?v=|/live/|\"videoId\"\\s*:\\s*\")([a-zA-Z0-9_-]+)")
-                    videoIdRegex.findAll(channelHtml).forEach { match ->
-                        val vid = match.groupValues[1]
-                        if (vid !in videoIds && vid !in listOf("live_stream", "hqdefault", "default")) {
-                            videoIds.add(vid)
+                    val parsedCandidates = parseCandidatesFromChannelHtml(channelHtml)
+                    if (parsedCandidates.isNotEmpty()) {
+                        candidates.addAll(parsedCandidates)
+                    } else {
+                        val videoIdRegex = Regex("""(?:/watch\?v=|/live/|"videoId"\s*:\s*")([a-zA-Z0-9_-]+)""")
+                        videoIdRegex.findAll(channelHtml).forEach { match ->
+                            val vid = match.groupValues[1]
+                            if (vid !in videoIds && vid !in listOf("live_stream", "hqdefault", "default")) {
+                                videoIds.add(vid)
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -472,87 +569,87 @@ class KtorScheduleScraper(
                 }
             }
 
-            if (videoIds.isEmpty()) return null
+            // Fallback: inspect individual watch pages only if ytInitialData gave no candidates
+            if (candidates.isEmpty() && videoIds.isNotEmpty()) {
+                for (videoId in videoIds.take(4)) {
+                    val directUrl = "https://www.youtube.com/watch?v=$videoId"
+                    val thumbUrl = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
 
-            // Inspect candidate streams (up to 8 candidates)
-            val candidates = mutableListOf<EnrichedStreamMetadata>()
-            for (videoId in videoIds.take(8)) {
-                val directUrl = "https://www.youtube.com/watch?v=$videoId"
-                val thumbUrl = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+                    val watchHtml = try {
+                        httpClient.get(directUrl) {
+                            headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                        }.bodyAsText()
+                    } catch (e: Exception) {
+                        continue
+                    }
 
-                val watchHtml = try {
-                    httpClient.get(directUrl) {
-                        headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                    }.bodyAsText()
-                } catch (e: Exception) {
-                    continue
-                }
+                    val titleRegex = Regex("<title>(.*?)(?: - YouTube)?</title>")
+                    val title = titleRegex.find(watchHtml)?.groupValues?.get(1)?.replace("&amp;", "&")
 
-                val titleRegex = Regex("<title>(.*?)(?: - YouTube)?</title>")
-                val title = titleRegex.find(watchHtml)?.groupValues?.get(1)?.replace("&amp;", "&")
+                    val runsWaitingRegex = Regex("\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"[^\"]*waiting", RegexOption.IGNORE_CASE)
+                    val textWaitingRegex = Regex("\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"\\s*waiting", RegexOption.IGNORE_CASE)
+                    val literalWaitingRegex = Regex("([0-9,]+)\\s+waiting", RegexOption.IGNORE_CASE)
 
-                // Pre-game waiting count (for upcoming scheduled streams)
-                val runsWaitingRegex = Regex("\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"[^\"]*waiting", RegexOption.IGNORE_CASE)
-                val textWaitingRegex = Regex("\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"\\s*waiting", RegexOption.IGNORE_CASE)
-                val literalWaitingRegex = Regex("([0-9,]+)\\s+waiting", RegexOption.IGNORE_CASE)
+                    val waitingCount = runsWaitingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                        ?: textWaitingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                        ?: literalWaitingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
 
-                val waitingCount = runsWaitingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-                    ?: textWaitingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-                    ?: literalWaitingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                    val isUpcoming = Regex("\"isUpcoming\"\\s*:\\s*true").containsMatchIn(watchHtml) || 
+                        (waitingCount != null && waitingCount > 0)
+                    val isLive = (Regex("\"isLiveNow\"\\s*:\\s*true").containsMatchIn(watchHtml) || watchHtml.contains("watching now") || watchHtml.contains("BADGE_STYLE_TYPE_LIVE_NOW")) && !isUpcoming
 
-                val isUpcoming = Regex("\"isUpcoming\"\\s*:\\s*true").containsMatchIn(watchHtml) || 
-                    Regex("\"isLiveNow\"\\s*:\\s*false").containsMatchIn(watchHtml) || 
-                    (waitingCount != null && waitingCount > 0)
-                val isLive = (Regex("\"isLiveNow\"\\s*:\\s*true").containsMatchIn(watchHtml) || watchHtml.contains("watching now") || watchHtml.contains("BADGE_STYLE_TYPE_LIVE_NOW")) && !isUpcoming
+                    val origViewCountRegex = Regex("\"originalViewCount\"\\s*:\\s*\"(\\d+)\"")
+                    val runsViewCountRegex = Regex("\"viewCount\"\\s*:\\s*\\{\\s*\"videoViewCountRenderer\"\\s*:\\s*\\{.*?\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([0-9,]+)\"")
+                    val watchingRegex = Regex("\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"\\s*watching")
+                    val fallbackWatchingRegex = Regex("([0-9,]+)\\s+watching now")
 
-                // Real-time live viewers count (only for active live broadcasts)
-                val origViewCountRegex = Regex("\"originalViewCount\"\\s*:\\s*\"(\\d+)\"")
-                val runsViewCountRegex = Regex("\"viewCount\"\\s*:\\s*\\{\\s*\"videoViewCountRenderer\"\\s*:\\s*\\{.*?\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([0-9,]+)\"")
-                val watchingRegex = Regex("\"text\"\\s*:\\s*\"([0-9,]+)\"\\s*\\}\\s*,\\s*\\{\\s*\"text\"\\s*:\\s*\"\\s*watching")
-                val fallbackWatchingRegex = Regex("([0-9,]+)\\s+watching now")
+                    val viewerCount = if (isLive) {
+                        origViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.toIntOrNull()
+                            ?: runsViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                            ?: watchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                            ?: fallbackWatchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
+                    } else null
 
-                val viewerCount = if (isLive) {
-                    origViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.toIntOrNull()
-                        ?: runsViewCountRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-                        ?: watchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-                        ?: fallbackWatchingRegex.find(watchHtml)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull()
-                } else null
+                    val startTimestampRegex = Regex("\"startTimestamp\"\\s*:\\s*\"([^\"]+)\"")
+                    val scheduledStartTimeRegex = Regex("\"scheduledStartTime\"\\s*:\\s*\"(\\d+)\"")
+                    val scheduledStartTime = startTimestampRegex.find(watchHtml)?.groupValues?.get(1)
+                        ?: scheduledStartTimeRegex.find(watchHtml)?.groupValues?.get(1)
 
-                // Scheduled start time (ISO string or Unix timestamp)
-                val startTimestampRegex = Regex("\"startTimestamp\"\\s*:\\s*\"([^\"]+)\"")
-                val scheduledStartTimeRegex = Regex("\"scheduledStartTime\"\\s*:\\s*\"(\\d+)\"")
-                val scheduledStartTime = startTimestampRegex.find(watchHtml)?.groupValues?.get(1)
-                    ?: scheduledStartTimeRegex.find(watchHtml)?.groupValues?.get(1)
-
-                candidates.add(
-                    EnrichedStreamMetadata(
-                        videoId = videoId,
-                        directUrl = directUrl,
-                        thumbnailUrl = thumbUrl,
-                        waitingCount = waitingCount,
-                        viewerCount = viewerCount,
-                        isLiveBroadcast = isLive,
-                        scheduledStartTime = scheduledStartTime,
-                        title = title
+                    candidates.add(
+                        EnrichedStreamMetadata(
+                            videoId = videoId,
+                            directUrl = directUrl,
+                            thumbnailUrl = thumbUrl,
+                            waitingCount = waitingCount,
+                            viewerCount = viewerCount,
+                            isLiveBroadcast = isLive,
+                            scheduledStartTime = scheduledStartTime,
+                            title = title
+                        )
                     )
-                )
+                }
             }
 
             if (candidates.isEmpty()) return null
 
             // Prioritize English streams over Spanish:
-            // 1. Date matches AND is English (not Spanish)
-            // 2. Date matches AND is Spanish
-            // 3. Live broadcast AND is English
-            // 4. Live broadcast AND is Spanish
-            // 5. English streams
-            // 6. Any stream
+            // 1. English streams (0) vs Spanish streams (1)
+            // 2. Matching date or isLive
+            // 3. Active live broadcasts
+            // 4. Higher viewer count
+            // 5. Higher waiting count
             val sorted = candidates.sortedWith(
                 compareBy<EnrichedStreamMetadata> { candidate ->
-                    val matchesDate = if (targetDate != null) matchesGameDate(candidate, targetDate, today) else candidate.isLiveBroadcast
-                    if (matchesDate) 0 else 1
-                }.thenBy { candidate ->
                     if (isSpanishStream(candidate.title)) 1 else 0
+                }.thenBy { candidate ->
+                    val matchesDate = if (targetDate != null) matchesGameDate(candidate, targetDate, today) else candidate.isLiveBroadcast
+                    if (matchesDate || candidate.isLiveBroadcast) 0 else 1
+                }.thenByDescending { candidate ->
+                    if (candidate.isLiveBroadcast) 1 else 0
+                }.thenByDescending { candidate ->
+                    candidate.viewerCount ?: 0
+                }.thenByDescending { candidate ->
+                    candidate.waitingCount ?: 0
                 }
             )
 

@@ -14,8 +14,8 @@ data class GameEntity(
     val awayTeamShort: String,
     val startTime: String, // ISO string
     val youtubeUrl: String?,
-    val awayScore: Int,
-    val homeScore: Int,
+    val awayScore: Int? = null,
+    val homeScore: Int? = null,
     val status: String,
     val location: String,
     val date: String, // YYYY-MM-DD

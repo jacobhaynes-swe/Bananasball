@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -84,6 +85,7 @@ fun ScheduleScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -387,7 +389,8 @@ fun GameCard(
                     score = game.boxScore.awayScore,
                     runs = game.boxScore.awayRuns,
                     hits = game.boxScore.awayHits,
-                    isLive = isLiveGame
+                    isLive = isLiveGame,
+                    showScore = game.boxScore.hasOfficialStats
                 )
                 Spacer(Modifier.height(10.dp))
                 // Home Team Row
@@ -396,8 +399,32 @@ fun GameCard(
                     score = game.boxScore.homeScore,
                     runs = game.boxScore.homeRuns,
                     hits = game.boxScore.homeHits,
-                    isLive = isLiveGame
+                    isLive = isLiveGame,
+                    showScore = game.boxScore.hasOfficialStats
                 )
+
+                if (isLiveGame && !game.boxScore.hasOfficialStats) {
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("ℹ️", fontSize = 11.sp)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "Official stats not provided yet for this game",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
 
                 Spacer(Modifier.height(14.dp))
 
@@ -622,10 +649,11 @@ fun rememberBananaBallCountdown(gameStartTime: LocalDateTime, isLive: Boolean): 
 @Composable
 fun TeamRow(
     team: com.example.bananasball.domain.model.Team,
-    score: Int,
+    score: Int? = null,
     runs: Int? = null,
     hits: Int? = null,
-    isLive: Boolean = false
+    isLive: Boolean = false,
+    showScore: Boolean = true
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -684,20 +712,22 @@ fun TeamRow(
             }
         }
         
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = score.toString(),
-                fontWeight = FontWeight.Black,
-                fontSize = 22.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            if (isLive) {
+        if (score != null && showScore) {
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "PTS",
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = score.toString(),
+                    fontWeight = FontWeight.Black,
+                    fontSize = 22.sp,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                if (isLive) {
+                    Text(
+                        text = "PTS",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
