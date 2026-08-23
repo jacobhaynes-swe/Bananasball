@@ -39,6 +39,28 @@ This document outlines upcoming feature initiatives, testing improvements, and a
   - **Live Broadcast Alert**: Triggered when YouTube channel scraping detects active streaming with `isLive = true`.
   - **Showdown Alert**: Instant notification when a game ends in a tie at the 2-hour mark and enters the Showdown tiebreaker.
 
+### 6. 🍏 iOS & iPad Tablet Device Validation
+- **Concept**: Validate and polish the Compose Multiplatform iOS client (`iosApp`) on connected physical iPad and iPhone devices.
+- **Features**:
+  - **iPad Tablet Adaptive Layouts**: Optimize DateRibbon, multi-column standings/stats tables, and modal sheet sizing for larger tablet screen real estate and landscape orientation.
+  - **Physical Device Provisioning**: Wire Xcode signing configuration to deploy builds directly to physical test devices via USB.
+  - **iOS Platform Parity**: Verify Ktor Darwin engine networking, Coil image caching, Room SQLite persistence, and external URL scheme launch behavior on iOS.
+
+---
+
+## 📦 Distribution & App Store Publishing Roadmap
+
+### 1. 🛡️ F-Droid Inclusion (Top Priority)
+- **Goal**: Publish Bananasball on F-Droid as a 100% Free and Open Source Software (FOSS) application.
+- **Requirements**:
+  - Ensure zero proprietary binary blobs or non-FOSS tracking dependencies in build outputs.
+  - Maintain dynamic Coil image loading for brand assets without bundled proprietary media.
+  - Author reproducible `fdroiddata` build metadata recipe.
+
+### 2. 🏪 Google Play Store & Apple App Store
+- **Google Play**: Configure signed Android App Bundle (`.aab`) generation and release track automation.
+- **Apple App Store / TestFlight**: Configure Xcode archive, export compliance, and TestFlight beta distribution pipeline.
+
 ---
 
 ## 🏗️ Architecture & Infrastructure Backlog
