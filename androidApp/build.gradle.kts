@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.bananasball.android"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 4
-        versionName = "1.1.1"
+        versionCode = 5
+        versionName = "1.1.2"
     }
     packaging {
         resources {

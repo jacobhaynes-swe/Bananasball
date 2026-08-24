@@ -353,15 +353,16 @@ fun GameCard(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
                     Text(
                         text = game.location,
                         fontSize = 12.sp,
+                        lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f, fill = false)
+                        maxLines = 2,
+                        modifier = Modifier.weight(1f)
                     )
 
                     Spacer(Modifier.width(8.dp))

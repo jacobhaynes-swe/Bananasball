@@ -237,14 +237,19 @@ private fun GameDetailHeader(game: Game, detail: GameDetail?) {
                 Spacer(Modifier.height(10.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                 Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🏟", fontSize = 12.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text("🏟", fontSize = 12.sp, modifier = Modifier.padding(top = 1.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = if (detail?.venue?.city != null) "$venueName • ${detail.venue.city}, ${detail.venue.state ?: ""}" else venueName,
+                        text = if (detail?.venue?.city != null) "$venueName • ${detail.venue.city}, ${detail.venue.state ?: ""}".trimEnd(' ', ',') else venueName,
                         fontSize = 12.sp,
+                        lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -479,7 +484,7 @@ private fun LineupTabContent(detail: GameDetail) {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "${team.name} (${team.abbreviation})",
+                        text = getTeamSelectionDisplayName(team.name, team.abbreviation),
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
                         color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
@@ -618,7 +623,7 @@ private fun PitchingTabContent(detail: GameDetail) {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "${team.name} Bullpen",
+                        text = getTeamSelectionDisplayName(team.name, team.abbreviation),
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
                         color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
@@ -757,5 +762,19 @@ private fun ShowdownsTabContent(detail: GameDetail) {
                 }
             }
         }
+    }
+}
+
+private fun getTeamSelectionDisplayName(name: String, abbreviation: String = ""): String {
+    val lower = name.lowercase()
+    val abbr = abbreviation.uppercase()
+    return when {
+        lower.contains("indianapolis") || lower.contains("clown") || abbr == "IC" -> "Indianapolis"
+        lower.contains("texas") || lower.contains("tailgater") || abbr == "TG" -> "Texas"
+        lower.contains("savannah") || lower.contains("banana") || abbr == "SB" || abbr == "SAV" -> "Savannah"
+        lower.contains("firefighter") || abbr == "FF" -> "Firefighters"
+        lower.contains("party animal") || lower.contains("animal") || abbr == "PA" -> "Party Animals"
+        lower.contains("loco boco") || lower.contains("cerveceros") || abbr == "LBC" -> "Loco Boco"
+        else -> name.split(" ").firstOrNull() ?: name
     }
 }
